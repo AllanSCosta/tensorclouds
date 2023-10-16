@@ -20,12 +20,11 @@ class SequenceTransformer(hk.Module):
         self.dropout_rate = dropout_rate
         self.widening_factor = widening_factor
 
-
     def __call__(self, datum, is_training=False):
         hidden = hk.Embed(
             vocab_size=22, 
             embed_dim=self.dim
-        )(datum.residue_token)
+        )(datum.residue_token_masked)
 
         hidden = Transformer(
             num_heads=self.num_heads,
