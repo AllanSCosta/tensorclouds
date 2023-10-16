@@ -9,7 +9,7 @@ import numpy as np
 import optax
 import functools
 
-from losses import LossPipe
+from ..losses import LossPipe
 from .utils import inner_stack, clip_grads, inner_split
 
 from wandb.sdk.wandb_run import Run

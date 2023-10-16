@@ -89,3 +89,4 @@ class Transformer(hk.Module):
       h = h + h_dense
 
     return _layer_norm(h)
+

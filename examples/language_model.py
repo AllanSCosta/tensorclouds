@@ -7,9 +7,9 @@ from hydra_zen import builds, make_config
 from moleculib.protein.transform import ProteinCrop, ProteinPad
 from moleculib.protein.dataset import MonomerDataset
 
-from models import SequenceTransformer
-from losses import ResidueCrossEntropyLoss, LossPipe
-from pipeline.trainer import Trainer
+from kheiron.models import SequenceTransformer
+from kheiron.losses import ResidueCrossEntropyLoss, LossPipe
+from kheiron.pipeline import Trainer
  
 
 from typing import Dict
@@ -38,6 +38,7 @@ DEFAULTS = dict(
     learning_rate=1e-3,
     num_epochs=100,
     save_every=1000,
+    
 )
 
 class dotdict(dict):

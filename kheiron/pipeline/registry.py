@@ -7,7 +7,7 @@ import shutil
 from pathlib import Path
 import git
 
-from pipeline.platform import Platform
+from .platform import Platform
 import wandb
 
 
