@@ -124,7 +124,7 @@ def prepare_config(
 if __name__ == '__main__':
     # using a temporary dir for demonstration, but use 
     # an actual path when running this
-    from pipeline.registry import Registry
+    from kheiron.pipeline.registry import Registry
 
     print('running example training')
     cfg = prepare_config()
