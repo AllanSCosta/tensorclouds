@@ -1,4 +1,4 @@
-# `kheiron`
+#  🏹 `kheiron`
 
 Training Pipeline for Biomolecular Machine Learning
 
