@@ -1,4 +1,4 @@
-#  🏹 `kheiron`
+#  🏹 `kheiron` - Training Camp in Jax
 
 Training Pipeline for Biomolecular Machine Learning
 
