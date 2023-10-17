@@ -8,7 +8,7 @@ from moleculib.protein.transform import ProteinCrop, ProteinPad
 from moleculib.protein.dataset import MonomerDataset
 
 from kheiron.models import SequenceTransformer
-from kheiron.losses import ResidueCrossEntropyLoss, LossPipe
+from kheiron.losses import MaskedLanguageLoss, LossPipe
 from kheiron.pipeline import Trainer
  
 
