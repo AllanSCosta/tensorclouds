@@ -6,14 +6,16 @@ from jax.tree_util import tree_map, tree_flatten, tree_unflatten, register_pytre
 from typing import List, Tuple, Any
 import numpy as np
 import jax.numpy as jnp
-
+import jaxlib
 
 def register_pytree(Datum):
     def encode_datum_pytree(datum: Datum) -> List[Tuple]:
         attrs = []
         for attr, obj in vars(datum).items():
-            if ((type(obj) not in [np.ndarray, jnp.ndarray]) or
-                (obj.dtype not in [np.float64, np.float32, np.int64, np.int32])):
+            # NOTE(Allan): come back here and make it universal
+            # if ((type(obj) not in [np.ndarray, jnp.ndarray, jaxlib.xla_extension.ArrayImpl, jax.interpreters.partial_eval.DynamicJaxprTracer])
+            # or (obj.dtype not in [np.float64, np.float32, np.int64, np.int32, np.bool_])):
+            if attr in ['idcode', 'sequence']:
                 attrs.append(None)
             else:
                 attrs.append(obj)

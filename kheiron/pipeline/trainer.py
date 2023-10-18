@@ -18,9 +18,6 @@ from tqdm import tqdm
 import jax.numpy as jnp
 
 from moleculib.metrics import MetricsPipe
-from moleculib.protein.datum import ProteinDatum
-
-import os 
 
 class TrainState(NamedTuple):
     params: Any
@@ -105,13 +102,11 @@ class Trainer:
     def loss(self, params, rng, batch, step):
         rng_keys = jax.random.split(rng, len(batch))
 
-        def _apply_losses(params, rng_key, datum: ProteinDatum, step: int):
+        def _apply_losses(params, rng_key, datum: Any, step: int):
             model_output = self.transform.apply(params, rng_key, datum, True)
             return self.losses(rng_key, model_output, datum, step)
-
-        output, loss, metrics = jax.vmap(_apply_losses, in_axes=(None, 0, 0, None))(
-            params, rng_keys, inner_stack(batch), step
-        )
+        
+        output, loss, metrics = jax.vmap(_apply_losses, in_axes=(None, 0, 0, None))(params, rng_keys, inner_stack(batch), step)
         output = inner_split(output)
 
         loss = jnp.where(jnp.isnan(loss), 0.0, loss)
