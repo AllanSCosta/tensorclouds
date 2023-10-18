@@ -10,3 +10,11 @@ Training Pipeline for Biomolecular Machine Learning
 ```
 export KHEIRON_REGISTRY_PATH="/mas/projects/molecularmachines/experiments/generative/YOURNAME"
 ```
+
+
+### Weights & Biases Integration
+
+``` 
+export WANDB_MODE=online 
+export WANDB_MODE=disabled
+```
