@@ -26,7 +26,6 @@ class TrainState(NamedTuple):
     params: Any
     opt_state: Any
 
-
 class Trainer:
 
     def __init__(
@@ -45,6 +44,7 @@ class Trainer:
         sample_metrics: MetricsPipe,
         save_model: Callable,
         run: Run,
+        single_batch: bool = False,
         samples_path: str = None,
         source_hash: str = None,
     ):
@@ -74,6 +74,12 @@ class Trainer:
             ) for split in self.dataset.splits
         }
 
+        self.single_batch = single_batch
+        if self.single_batch:
+            print('[!!WARNING!!] using single batch')
+            sample_batch = next(iter(self.loaders['train']))
+            self.loaders = { 'train': [sample_batch] * 1000 }
+
         self.evaluate_every = evaluate_every
         self.samples_path = samples_path
         self.source_hash = source_hash
@@ -84,36 +90,15 @@ class Trainer:
         rng_seq = hk.PRNGSequence(self.seed)
         init_rng = next(rng_seq)
 
-        if self.source_hash is None:
-
-            def _init(rng, datum):
-                params = self.transform.init(rng, datum)
-                opt_state = self.optimizer.init(params)
-                return TrainState(
-                    params,
-                    opt_state,
-                )
-            train_state = jax.jit(_init)(init_rng, init_datum)
-            
-        else: 
-            path = f'/mas/projects/molecularmachines/experiments/generative/allanc3/{self.source_hash}/'
-            print('LOADING FROM PATH', path)
-            files = os.listdir(path)
-            # find last checkpoint file and load it
-            checkpoint_files = [f for f in files if f.startswith("params")]
-            checkpoint_files.sort(
-                key=lambda x: -os.path.getmtime(os.path.join(path, x))
-            )
-            checkpoint_file = checkpoint_files[-1]
-            with open(f'{path}{checkpoint_file}', 'rb') as f:
-                params = pickle.load(f)
+        def _init(rng, datum):
+            params = self.transform.init(rng, datum)
             opt_state = self.optimizer.init(params)
-
-            train_state = TrainState(
-                params=params,
-                opt_state=opt_state,
+            return TrainState(
+                params,
+                opt_state,
             )
-
+        train_state = jax.jit(_init)(init_rng, init_datum)
+            
         return rng_seq, train_state
 
     @functools.partial(jax.jit, static_argnums=(0,))
@@ -216,3 +201,23 @@ class Trainer:
                 rng_seq=rng_seq,
                 epoch=epoch,
             )
+
+
+# def recover():
+#     path = f'/mas/projects/molecularmachines/experiments/generative/allanc3/{self.source_hash}/'
+#     print('LOADING FROM PATH', path)
+#     files = os.listdir(path)
+#     # find last checkpoint file and load it
+#     checkpoint_files = [f for f in files if f.startswith("params")]
+#     checkpoint_files.sort(
+#         key=lambda x: -os.path.getmtime(os.path.join(path, x))
+#     )
+#     checkpoint_file = checkpoint_files[-1]
+#     with open(f'{path}{checkpoint_file}', 'rb') as f:
+#         params = pickle.load(f)
+#     opt_state = self.optimizer.init(params)
+
+#     train_state = TrainState(
+#         params=params,
+#         opt_state=opt_state,
+#     )

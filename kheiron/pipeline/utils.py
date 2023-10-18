@@ -3,25 +3,26 @@ import jax
 import jax.numpy as jnp
 from jax.tree_util import tree_map, tree_flatten, tree_unflatten, register_pytree_node
 
-
 from typing import List, Tuple, Any
-from moleculib.protein.datum import ProteinDatum
+import numpy as np
+import jax.numpy as jnp
 
 
-def encode_datum_pytree(datum: ProteinDatum) -> List[Tuple]:
-    return [
-        (None if attr in ["idcode", "sequence"] else obj)
-        for attr, obj in vars(datum).items()
-    ], vars(datum).keys()
+def register_pytree(Datum):
+    def encode_datum_pytree(datum: Datum) -> List[Tuple]:
+        attrs = []
+        for attr, obj in vars(datum).items():
+            if ((type(obj) not in [np.ndarray, jnp.ndarray]) or
+                (obj.dtype not in [np.float64, np.float32, np.int64, np.int32])):
+                attrs.append(None)
+            else:
+                attrs.append(obj)
+        return attrs, vars(datum).keys()
 
+    def decode_datum_pytree(keys, values: List[Any]) -> Datum:
+        return Datum(**dict(zip(keys, values)))
 
-def decode_datum_pytree(keys, values: List[Any]) -> ProteinDatum:
-    return ProteinDatum(**dict(zip(keys, values)))
-
-
-register_pytree_node(ProteinDatum, encode_datum_pytree, decode_datum_pytree)
-
-
+    register_pytree_node(Datum, encode_datum_pytree, decode_datum_pytree)
 
 def l2_norm(tree):
     """Compute the l2 norm of a pytree of arrays. Useful for weight decay."""

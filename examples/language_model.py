@@ -4,7 +4,7 @@ import numpy as np
 
 from hydra_zen import builds, make_config
 
-from moleculib.protein.transform import ProteinCrop, ProteinPad
+from moleculib.protein.transform import ProteinCrop, ProteinPad, MaskResidues
 from moleculib.protein.dataset import MonomerDataset
 
 from kheiron.models import SequenceTransformer
@@ -66,6 +66,7 @@ def prepare_config(
     transform = [
         builds(ProteinCrop, crop_size=hparams.sequence_length),
         builds(ProteinPad, pad_size=hparams.sequence_length, random_position=False),
+        builds(MaskResidues, mask_ratio=0.15)
     ]
     
     DatasetCfg = builds(
@@ -91,7 +92,7 @@ def prepare_config(
     )
 
     loss_list = [
-        builds(ResidueCrossEntropyLoss, weight=1.0, start_step=0),
+        builds(MaskedLanguageLoss, weight=1.0, start_step=0),
     ]
 
     LossCfg = builds(LossPipe, loss_list=loss_list)
