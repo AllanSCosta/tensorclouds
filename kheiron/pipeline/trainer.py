@@ -42,8 +42,8 @@ class Trainer:
         save_model: Callable,
         run: Run,
         single_batch: bool = False,
-        samples_path: str = None,
-        source_hash: str = None,
+        plot_pipe: Callable = None,
+        plot_every: int = 1000,
     ):
         self.model = model
         self.transform = hk.transform(lambda *args: model()(*args))
@@ -77,9 +77,10 @@ class Trainer:
             sample_batch = next(iter(self.loaders['train']))
             self.loaders = { 'train': [sample_batch] * 1000 }
 
+        self.plot_pipe = plot_pipe
+        self.plot_every = plot_every
+
         self.evaluate_every = evaluate_every
-        self.samples_path = samples_path
-        self.source_hash = source_hash
         
     def init(self):
         print("Initializing Model...")
@@ -117,7 +118,7 @@ class Trainer:
 
     @functools.partial(jax.jit, static_argnums=(0,))
     def update(self, rng, state, batch, step):
-        grad, (_, loss, metrics) = jax.grad(
+        grad, (output, loss, metrics) = jax.grad(
             lambda params, rng, batch, step: self.loss(params, rng, batch, step),
             has_aux=True,
         )(state.params, rng, batch, step)
@@ -133,7 +134,7 @@ class Trainer:
         updates, opt_state = self.optimizer.update(grad, state.opt_state, state.params)
         params = optax.apply_updates(state.params, updates)
 
-        return TrainState(params, opt_state), metrics
+        return output, TrainState(params, opt_state), metrics
     
     def epoch(
         self,
@@ -155,7 +156,7 @@ class Trainer:
                 if split == 'train':
                     total_step = epoch * len(pbar) + step
 
-                new_train_state, metrics = self.update(
+                output, new_train_state, metrics = self.update(
                     next(rng_seq), train_state, batch, total_step
                 )
                 pbar.set_postfix({"loss": f"{metrics['loss']:.3e}"})
@@ -178,9 +179,12 @@ class Trainer:
 
                 if split == 'train' and total_step % self.save_every == 0:
                     self.save_model(train_state.params)
-            
+
+                if (self.plot_pipe is not None) and split == 'train' and total_step % self.plot_every == 0:
+                    self.plot_pipe(self.run, output, batch)
+
             for k, v in epoch_metrics.items():
-                self.run.track(
+                self.run.log(
                     {f'{split}/{k}': float(np.mean(v))},
                     step=total_step,
                 )
