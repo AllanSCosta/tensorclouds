@@ -76,18 +76,17 @@ class Registry:
         dirs.sort(key=lambda x: -os.path.getmtime(os.path.join(self.path, x)))
         return dirs
 
-    def get_platform(self, hash: str, read_only=True) -> Platform:
-        raise NotImplementedError
-        # if hash not in self.fetch_platform_names():
-        #     raise ValueError(f"Platform {hash} does not exist")
-        # if (not os.path.exists(self.path / hash / "config.yml")) or (
-        #     not os.path.exists(self.path / hash / "code/")
-        # ):
-        #     raise ValueError(f"Platform {hash} is missing config.yml or code")
-        # platform_path = self.path / hash
-        
-        # run = Run(repo=self.repo, run_hash=hash, read_only=read_only)
-        # return Platform(hash, platform_path, run, self.repo)
+    def get_platform(self, name: str, read_only=True) -> Platform:
+        if name not in self.fetch_platform_names():
+            raise ValueError(f"Platform {name} does not exist")
+        if (not os.path.exists(self.path / name / "config.yml")) or (
+            not os.path.exists(self.path / name / "code/")
+        ):
+            raise ValueError(f"Platform {name} is missing config.yml or code")
+        platform_path = self.path / name
+
+        run = None # Run(repo=self.repo, run_hash=hash, read_only=read_only)
+        return Platform(hash, platform_path, run)
 
     def get_git_info(self):
         repo = git.Repo(self.source)
