@@ -75,13 +75,13 @@ class Platform:
 
         self.checkpoint_index = 0
 
-    def new_trainer(self):
+    def new_trainer(self, params=None):
         print("Instantiating Training Pipeline...")
         print(json.dumps(yaml.safe_load(to_yaml(self.cfg)), indent=4))
 
         def _train_wrapper(trainer, env, zen_cfg) -> None:
             trainer_ = trainer(run=self.run, save_model=self.save_model)
-            trainer_.train()
+            trainer_.train(params)
 
         train = zen(_train_wrapper, pre_call=_setup)
         train.validate(self.cfg)
@@ -97,6 +97,15 @@ class Platform:
     def instantiate_model(self):
         instantiable_cfg = load_from_yaml(self.cfg_path)
         return instantiate(instantiable_cfg.trainer.model)
+
+    def get_file(self, filename):
+        with open(str(self.path / filename), "rb") as file:
+            data = pickle.load(file)
+        return data
+    
+    def save_file(self, filename, data):
+        with open(str(self.path / filename), "wb") as file:
+            pickle.dump(data, file)
 
     def get_params(self, checkpoint_index=-1):
         files = os.listdir(self.path)

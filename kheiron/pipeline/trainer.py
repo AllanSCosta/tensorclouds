@@ -44,6 +44,10 @@ class Trainer:
         single_batch: bool = False,
         plot_pipe: Callable = None,
         plot_every: int = 1000,
+        load_weights: bool = False,
+        sample_every: int = None,
+        sample_model: Callable = None,
+        sample_plot: Callable = None,
     ):
         self.model = model
         self.transform = hk.transform(lambda *args: model()(*args))
@@ -58,7 +62,6 @@ class Trainer:
         self.batch_size = batch_size
         self.num_workers = num_workers
         print(f"Batch Size: {self.batch_size}")
-
         self.save_model = save_model
         self.run = run
         self.max_grad = 1000.0
@@ -81,7 +84,12 @@ class Trainer:
         self.plot_every = plot_every
 
         self.evaluate_every = evaluate_every
-        
+        self.load_weights = load_weights
+
+        self.sample_every = sample_every
+        self.sample_model = sample_model
+        self.sample_plot = sample_plot
+
     def init(self):
         print("Initializing Model...")
         init_datum = self.dataset.splits['train'][0]
@@ -183,6 +191,11 @@ class Trainer:
                 if (self.plot_pipe is not None) and split == 'train' and total_step % self.plot_every == 0:
                     self.plot_pipe(self.run, output, batch)
 
+                if (self.sample_every is not None) and split == 'train' and total_step % self.sample_every == 0:
+                    keys = jax.random.split(next(rng_seq), 9)
+                    samples = jax.vmap(self.sample_model, in_axes=(None, 0))(train_state.params, keys)
+                    self.sample_plot(self.run, samples, None)
+
             for k, v in epoch_metrics.items():
                 self.run.log(
                     {f'{split}/{k}': float(np.mean(v))},
@@ -191,8 +204,10 @@ class Trainer:
                 
         return train_state
 
-    def train(self) -> Run:
+    def train(self, params=None) -> Run:
         rng_seq, train_state = self.init()
+        if params is not None:
+            train_state = TrainState(params, train_state.opt_state)
         print("Starting Training Loop...")
         for epoch in tqdm(range(self.num_epochs), position=0):
             train_state = self.epoch(
@@ -200,23 +215,3 @@ class Trainer:
                 rng_seq=rng_seq,
                 epoch=epoch,
             )
-
-
-# def recover():
-#     path = f'/mas/projects/molecularmachines/experiments/generative/allanc3/{self.source_hash}/'
-#     print('LOADING FROM PATH', path)
-#     files = os.listdir(path)
-#     # find last checkpoint file and load it
-#     checkpoint_files = [f for f in files if f.startswith("params")]
-#     checkpoint_files.sort(
-#         key=lambda x: -os.path.getmtime(os.path.join(path, x))
-#     )
-#     checkpoint_file = checkpoint_files[-1]
-#     with open(f'{path}{checkpoint_file}', 'rb') as f:
-#         params = pickle.load(f)
-#     opt_state = self.optimizer.init(params)
-
-#     train_state = TrainState(
-#         params=params,
-#         opt_state=opt_state,
-#     )
