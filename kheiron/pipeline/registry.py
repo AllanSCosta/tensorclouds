@@ -1,11 +1,10 @@
 import yaml
 import hydra_zen
-import randomname
 import logging
 import os
 import shutil
 from pathlib import Path
-import git
+# import git
 
 from .platform import Platform
 import wandb
@@ -36,13 +35,14 @@ class Registry:
         self.path = Path(path)
         self.source = Path(source)
 
-    def new_platform(self, cfg) -> Platform:
+    def new_platform(self, cfg, tags=None) -> Platform:
         yml_cfg = hydra_zen.to_yaml(cfg)
         cfg_dict = yaml.safe_load(yml_cfg)
         run = wandb.init(
             project=self.project,
             dir=self.path,
             config=cfg_dict,
+            tags=tags
         )
 
         name = run.name

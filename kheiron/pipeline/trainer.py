@@ -17,11 +17,22 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import jax.numpy as jnp
 
-from moleculib.metrics import MetricsPipe
+# from moleculib.metrics import MetricsPipe
 
 class TrainState(NamedTuple):
     params: Any
     opt_state: Any
+
+@functools.partial(jax.jit, static_argnums=(0,))
+def _jit_forward(model, params, keys, batch):
+    return inner_split(
+        jax.vmap(model, in_axes=(None, 0, 0))(params, keys, inner_stack(batch))
+    )
+
+@functools.partial(jax.jit, static_argnums=(0,))
+def _jit_metrics(f, outputs, batch):
+    outputs, batch, metrics = jax.vmap(f, in_axes=(0,0))(inner_stack(outputs), inner_stack(batch))
+    return inner_split(outputs), inner_split(batch), metrics
 
 class Trainer:
 
@@ -38,12 +49,16 @@ class Trainer:
         save_every,
         evaluate_every,
         sample_batch_size,
-        sample_metrics: MetricsPipe,
+        # sample_metrics: MetricsPipe,
         save_model: Callable,
         run: Run,
         single_batch: bool = False,
+        
         plot_pipe: Callable = None,
         plot_every: int = 1000,
+        plot_model: Callable = None,
+        # plot_metrics: MetricsPipe = None,
+
         load_weights: bool = False,
         sample_every: int = None,
         sample_model: Callable = None,
@@ -82,6 +97,8 @@ class Trainer:
 
         self.plot_pipe = plot_pipe
         self.plot_every = plot_every
+        self.plot_model = plot_model
+        # self.plot_metrics = plot_metrics
 
         self.evaluate_every = evaluate_every
         self.load_weights = load_weights
@@ -104,7 +121,10 @@ class Trainer:
                 opt_state,
             )
         train_state = jax.jit(_init)(init_rng, init_datum)
-            
+        num_params = hk.data_structures.tree_size(train_state.params)
+        print(f"Model has {num_params} parameters!")
+        self.run.summary["NUM_PARAMS"] = num_params
+
         return rng_seq, train_state
 
     @functools.partial(jax.jit, static_argnums=(0,))
@@ -150,6 +170,8 @@ class Trainer:
         rng_seq,
         epoch,
     ) -> Tuple[Dict, Dict]:
+        epoch_metrics = defaultdict(list)
+
         for split in self.dataset.splits:
             if split != 'train' and epoch % self.evaluate_every != 0:
                 continue
@@ -158,11 +180,16 @@ class Trainer:
 
             pbar = tqdm(loader, position=1, disable=False)
             pbar.set_description(f"[{self.run.name}] {split}@{epoch}")
-            epoch_metrics = defaultdict(list)
             
+            batch_size = None
+
             for step, batch in enumerate(pbar):
-                if split == 'train':
-                    total_step = epoch * len(pbar) + step
+                total_step = epoch * len(loader) + step
+
+                # if batch_size is not None and len(batch) != batch_size:
+                    # continue
+                # if step == 0:
+                    # batch_size = len(batch)
 
                 output, new_train_state, metrics = self.update(
                     next(rng_seq), train_state, batch, total_step
@@ -173,17 +200,8 @@ class Trainer:
                 has_nan = tree_reduce(_param_has_nan, new_train_state.params, initializer=False)
                 metrics.update(dict(has_nan=has_nan))
 
-                for k, v in metrics.items():
-                    epoch_metrics[k].append(float(v))
-
                 if not has_nan and split == 'train':
                     train_state = new_train_state
-
-                if split == 'train':
-                    self.run.log(
-                        {k: float(v) for (k, v) in metrics.items()},
-                        step=total_step,
-                    )
 
                 if split == 'train' and total_step % self.save_every == 0:
                     self.save_model(train_state.params)
@@ -196,12 +214,12 @@ class Trainer:
                     samples = jax.vmap(self.sample_model, in_axes=(None, 0))(train_state.params, keys)
                     self.sample_plot(self.run, samples, None)
 
-            for k, v in epoch_metrics.items():
-                self.run.log(
-                    {f'{split}/{k}': float(np.mean(v))},
-                    step=total_step,
-                )
-                
+        for k, v in epoch_metrics.items():
+            self.run.log(
+                {k: float(np.mean(v))},
+                step=epoch,
+            )
+            
         return train_state
 
     def train(self, params=None) -> Run:
