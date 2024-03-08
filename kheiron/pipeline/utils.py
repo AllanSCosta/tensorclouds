@@ -43,19 +43,6 @@ def register_pytree(Datum):
     register_pytree_node(Datum, encode_datum_pytree, decode_datum_pytree)
 
 
-def inner_stack(pytrees):
-    return jax.tree_util.tree_map(lambda *values: jnp.stack(values, axis=0), *pytrees)
-
-
-def inner_split(pytree):
-    leaves, defs = tree_flatten(pytree)
-    splits = [
-        [arr.squeeze(0) for arr in jnp.split(leaf, len(leaf), axis=0)]
-        for leaf in leaves
-    ]
-    splits = list(zip(*splits))
-    return [tree_unflatten(defs, split) for split in splits]
-
 
 def l2_norm(tree):
     """Compute the l2 norm of a pytree of arrays. Useful for weight decay."""

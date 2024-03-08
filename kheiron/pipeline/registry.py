@@ -59,11 +59,11 @@ class Registry:
             ]
             return ignore_list
 
-        shutil.copytree(
-            str(self.source),
-            str(platform_dir / "code/"),
-            ignore=ignore_files,
-        )
+        # shutil.copytree(
+        #     str(self.source),
+        #     str(platform_dir / "code/"),
+        #     ignore=ignore_files,
+        # )
 
         with open(f"{platform_dir}/config.yml", "w") as file:
             file.write(yml_cfg)
