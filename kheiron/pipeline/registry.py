@@ -59,11 +59,11 @@ class Registry:
             ]
             return ignore_list
 
-        # shutil.copytree(
-        #     str(self.source),
-        #     str(platform_dir / "code/"),
-        #     ignore=ignore_files,
-        # )
+        shutil.copytree(
+            str(self.source / "model"),
+            str(platform_dir / "code/"),
+            ignore=ignore_files,
+        )
 
         with open(f"{platform_dir}/config.yml", "w") as file:
             file.write(yml_cfg)
@@ -79,10 +79,10 @@ class Registry:
     def get_platform(self, name: str, read_only=True) -> Platform:
         if name not in self.fetch_platform_names():
             raise ValueError(f"Platform {name} does not exist")
-        if (not os.path.exists(self.path / name / "config.yml")) or (
-            not os.path.exists(self.path / name / "code/")
-        ):
-            raise ValueError(f"Platform {name} is missing config.yml or code")
+        if not os.path.exists(self.path / name / "config.yml"):
+            raise ValueError(f"Platform {name} is missing config.yml")
+        # if not os.path.exists(self.path / name / "code"):
+        #     raise ValueError(f"Platform {name} is missing code directory"
         platform_path = self.path / name
 
         run = None # Run(repo=self.repo, run_hash=hash, read_only=read_only)

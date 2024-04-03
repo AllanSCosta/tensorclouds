@@ -14,7 +14,10 @@ ACCEPTED_FORMATS = [
     jnp.ndarray, 
     jaxlib.xla_extension.ArrayImpl, 
     jax.interpreters.partial_eval.DynamicJaxprTracer,
+    jax._src.interpreters.batching.BatchTracer  
 ]
+
+import e3nn_jax as e3nn
 
 ACCEPTED_TYPES = [
     np.float64, np.float32, np.int64, np.int32, np.bool_
@@ -28,7 +31,7 @@ def register_pytree(Datum):
         for attr, obj in vars(datum).items():
             # NOTE(Allan): come back here and make it universal
             if (type(obj) == object) or ((type(obj) in ACCEPTED_FORMATS)
-                and (obj.dtype in ACCEPTED_TYPES)):
+                and (obj.dtype in ACCEPTED_TYPES)) or (type(obj) == e3nn.IrrepsArray):
                 went_through = True 
                 attrs.append(obj)
             else:

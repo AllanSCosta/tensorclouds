@@ -24,6 +24,7 @@ class TrainState(NamedTuple):
     params: Any
     opt_state: Any
 
+
 # @functools.partial(jax.jit, static_argnums=(0,))
 # def _jit_forward(model, params, keys, batch):
 #     return inner_split(
@@ -63,7 +64,9 @@ class Trainer:
         load_weights: bool = False,
         sample_every: int = None,
         sample_model: Callable = None,
+        sample_params: str = None,
         sample_plot: Callable = None,
+
         sample_batch_size=None,
         sample_metrics=None,
 
@@ -95,10 +98,12 @@ class Trainer:
 
         self.single_batch = single_batch
         self.single_datum = single_datum
+
         if self.single_batch:
             print('[!!WARNING!!] using single batch')
             sample_batch = next(iter(self.loaders['train']))
             self.loaders = { 'train': [sample_batch] * 1000 }
+
         elif self.single_datum:
             print('[!!WARNING!!] using single datum')
             sample_batch = next(iter(self.loaders['train']))
@@ -116,17 +121,21 @@ class Trainer:
 
         self.sample_every = sample_every
         if sample_every:
-            _sample_model = hk.transform(lambda: model()(is_training=False))
-            def sample_model(params, keys):
-                return _sample_model.apply(params, keys)
-            self.sample_model = sample_model
+            sample_model_transform = hk.transform(lambda: sample_model().sample())
+            @jax.jit
+            def _sample_model(params, key):
+                return sample_model_transform.apply(params, key)
+            if sample_params:
+                with open(sample_params, 'rb') as f:
+                    self.sample_params = pickle.load(f)
+            self.sample_model = _sample_model
             self.sample_plot = sample_plot
+            self.sample_metrics = sample_metrics
 
     def init(self):
         print("Initializing Model...")
         init_datum = self.dataset.splits['train'][0]
 
-        # TODO(Allan): add the transforms here?
         rng_seq = hk.PRNGSequence(self.seed)
         init_rng = next(rng_seq)
 
@@ -140,6 +149,7 @@ class Trainer:
     
         train_state = jax.jit(_init)(init_rng, init_datum)
         num_params = hk.data_structures.tree_size(train_state.params)
+
         print(f"Model has {num_params} parameters!")
         self.run.summary["NUM_PARAMS"] = num_params
 
@@ -184,35 +194,27 @@ class Trainer:
         rng_seq,
         epoch,
     ) -> Tuple[Dict, Dict]:
-        epoch_metrics = defaultdict(list)
 
-        for split in self.dataset.splits:
+        for split in self.loaders.keys():
             if split != 'train' and epoch % self.evaluate_every != 0:
                 continue
-
+            
             loader = self.loaders[split]
 
             pbar = tqdm(loader, position=1, disable=False)
             pbar.set_description(f"[{self.run.name}] {split}@{epoch}")
             
             # batch_size = None
+            epoch_metrics = defaultdict(list)
 
             for step, batch in enumerate(pbar):
                 total_step = epoch * len(loader) + step
-
-                # if batch_size is not None and len(batch) != batch_size:
-                    # continue
-                # if step == 0:
-                    # batch_size = len(batch)
+         
                 keys = jax.random.split(next(rng_seq), len(batch))
                 output, new_train_state, metrics = self.update(
                     keys, train_state, inner_stack(batch), total_step
                 )
                 output = inner_split(output)
-                # except KeyboardInterrupt:
-                    # raise
-                # except:
-                    # breakpoint()
                 pbar.set_postfix({"loss": f"{metrics['loss']:.3e}"})
 
                 _param_has_nan = lambda agg, p: jnp.isnan(p).any() | agg
@@ -224,28 +226,53 @@ class Trainer:
 
                 if (self.plot_pipe is not None) and split == 'train' and total_step % self.plot_every == 0:
                     self.plot_pipe(self.run, output, batch)
-
+                
                 if (self.sample_every is not None) and split == 'train' and total_step % self.sample_every == 0:
                     keys = jax.random.split(next(rng_seq), 9)
                     start = time.time()
-                    samples = jax.vmap(self.sample_model, in_axes=(None, 0))(train_state.params, keys)
+                    if hasattr(self, 'sample_params'):
+                        params_ = {**train_state.params, **self.sample_params}
+                    else: 
+                        params_ = train_state.params
+                    samples = jax.vmap(self.sample_model, in_axes=(None, 0))(params_, keys)
                     end = time.time()
                     if total_step != 0: 
                         metrics.update({'sample_time': end - start})
+
+                    samples = inner_split(samples)
+                    # outputs = [output.datum for output in outputs]
+                    samples = [output.replace(protein_data=inner_split(output.protein_data)) for output in samples]
+
                     self.sample_plot(self.run, samples, None)
+
+                    if self.sample_metrics:
+                        metrics.update(
+                            self.sample_metrics(samples)
+                        )
+
                 
                 if split == 'train':
                     self.run.log(
-                        {k: float(v) for (k, v) in metrics.items()},
-                        step=total_step,
+                        {
+                            **{f'{split}/{k}': float(v) 
+                               for (k, v) in metrics.items()},
+                            'step':total_step,
+                        }
                     )    
                     if total_step % self.save_every == 0:
                         self.save_model(train_state.params)
 
-        for k, v in epoch_metrics.items():
+                for k, v in metrics.items():
+                    epoch_metrics[k].append(v)                
+
             self.run.log(
-                {k: float(np.mean(v))},
-                step=epoch,
+                {
+                    **{ 
+                        f'{split}/{k}_epoch': float(np.mean(v)) 
+                        for (k, v) in epoch_metrics.items()
+                    },
+                    'epoch': epoch
+                },
             )
             
         return train_state
