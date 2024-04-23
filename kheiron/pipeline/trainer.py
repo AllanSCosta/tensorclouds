@@ -55,7 +55,8 @@ class Trainer:
 
         single_datum: bool = False,
         single_batch: bool = False,
-        
+        train_only: bool = False,
+
         plot_pipe: Callable = None,
         plot_every: int = 1000,
         plot_model: Callable = None,
@@ -96,6 +97,7 @@ class Trainer:
             ) for split in self.dataset.splits
         }
 
+        self.train_only = train_only
         self.single_batch = single_batch
         self.single_datum = single_datum
 
@@ -150,7 +152,7 @@ class Trainer:
         train_state = jax.jit(_init)(init_rng, init_datum)
         num_params = hk.data_structures.tree_size(train_state.params)
 
-        print(f"Model has {num_params} parameters!")
+        print(f"Model has {num_params:.3e} parameters")
         self.run.summary["NUM_PARAMS"] = num_params
 
         return rng_seq, train_state
@@ -196,7 +198,7 @@ class Trainer:
     ) -> Tuple[Dict, Dict]:
 
         for split in self.loaders.keys():
-            if split != 'train' and epoch % self.evaluate_every != 0:
+            if (self.train_only and split != 'train') or (split != 'train' and epoch % self.evaluate_every != 0):
                 continue
             
             loader = self.loaders[split]
@@ -240,7 +242,8 @@ class Trainer:
                         metrics.update({'sample_time': end - start})
 
                     samples = inner_split(samples)
-                    # outputs = [output.datum for output in outputs]
+                    
+                    # TODO(Allan): remove this
                     samples = [output.replace(protein_data=inner_split(output.protein_data)) for output in samples]
 
                     self.sample_plot(self.run, samples, None)
