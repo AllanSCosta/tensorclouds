@@ -14,7 +14,8 @@ ACCEPTED_FORMATS = [
     jnp.ndarray, 
     jaxlib.xla_extension.ArrayImpl, 
     jax.interpreters.partial_eval.DynamicJaxprTracer,
-    jax._src.interpreters.batching.BatchTracer  
+    jax._src.interpreters.batching.BatchTracer, 
+    jax._src.core.ShapedArray, 
 ]
 
 import e3nn_jax as e3nn

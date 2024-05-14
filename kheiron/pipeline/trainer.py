@@ -18,23 +18,11 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import jax.numpy as jnp
 
-# from moleculib.metrics import MetricsPipe
 
 class TrainState(NamedTuple):
     params: Any
     opt_state: Any
 
-
-# @functools.partial(jax.jit, static_argnums=(0,))
-# def _jit_forward(model, params, keys, batch):
-#     return inner_split(
-#         jax.vmap(model, in_axes=(None, 0, 0))(params, keys, inner_stack(batch))
-#     )
-
-# @functools.partial(jax.jit, static_argnums=(0,))
-# def _jit_metrics(f, outputs, batch):
-#     outputs, batch, metrics = jax.vmap(f, in_axes=(0,0))(inner_stack(outputs), inner_stack(batch))
-#     return inner_split(outputs), inner_split(batch), metrics
 
 class Trainer:
 
@@ -49,7 +37,8 @@ class Trainer:
         batch_size,
         num_workers,
         save_every,
-        evaluate_every,
+        validate_every,
+
         save_model: Callable,
         run: Run,
 
@@ -118,21 +107,24 @@ class Trainer:
         self.plot_model = plot_model
         # self.plot_metrics = plot_metrics
 
-        self.evaluate_every = evaluate_every
+        self.validate_every = validate_every
         self.load_weights = load_weights
 
         self.sample_every = sample_every
+         
         if sample_every:
-            sample_model_transform = hk.transform(lambda: sample_model().sample())
+            sample_model_transform = hk.transform(lambda *args: sample_model().sample(*args))
             @jax.jit
-            def _sample_model(params, key):
-                return sample_model_transform.apply(params, key)
+            def _sample_model(params, key, *args):
+                return sample_model_transform.apply(params, key, *args)
             if sample_params:
                 with open(sample_params, 'rb') as f:
                     self.sample_params = pickle.load(f)
             self.sample_model = _sample_model
             self.sample_plot = sample_plot
             self.sample_metrics = sample_metrics
+            self.sample_conditional = True
+            self.plot_mode = 'trajectory'
 
     def init(self):
         print("Initializing Model...")
@@ -190,6 +182,46 @@ class Trainer:
 
         return output, TrainState(params, opt_state), metrics
     
+    def run_sample(self, rng_seq, state, batch, step):
+        keys = jax.random.split(next(rng_seq), min(9, len(batch)))
+
+        if hasattr(self, 'sample_params'):
+            params_ = {**state.params, **self.sample_params}
+        else: 
+            params_ = state.params
+
+        batched = inner_stack(batch[:9])
+
+        start = time.time()
+        samples, trajectories = jax.vmap(
+            self.sample_model, 
+            in_axes=(None, 0, 0)
+        )(params_, keys, batched)
+        end = time.time()
+        samples = inner_split(samples)
+    
+        sample_metrics = {}
+
+        if step != 0: 
+            sample_metrics.update({'sample_time': end - start})
+
+        if self.plot_mode == 'samples':
+            self.sample_plot(self.run, samples, None)
+
+        elif self.plot_mode == 'trajectory':
+            trajectories = [inner_split(traj) for traj in inner_split(trajectories)]
+            self.sample_plot(self.run, trajectories, None)
+
+        if self.sample_metrics:
+            sample_metrics_ = defaultdict(list)
+            for sample, batch in zip(samples, batch):
+                sample_metrics = self.sample_metrics(sample, batch)
+                for k, v in sample_metrics.items():
+                    sample_metrics_[k].append(v)
+            sample_metrics.update({k: np.mean(v) for k, v in sample_metrics_.items()})
+
+        return sample_metrics
+
     def epoch(
         self,
         train_state,
@@ -198,7 +230,7 @@ class Trainer:
     ) -> Tuple[Dict, Dict]:
 
         for split in self.loaders.keys():
-            if (self.train_only and split != 'train') or (split != 'train' and epoch % self.evaluate_every != 0):
+            if (self.train_only and split != 'train') or (split != 'train' and epoch % self.validate_every != 0):
                 continue
             
             loader = self.loaders[split]
@@ -210,17 +242,25 @@ class Trainer:
             epoch_metrics = defaultdict(list)
 
             for step, batch in enumerate(pbar):
+                if len(batch) != self.batch_size:
+                    continue
                 total_step = epoch * len(loader) + step
          
                 keys = jax.random.split(next(rng_seq), len(batch))
+                batched = inner_stack(batch)
+
                 output, new_train_state, metrics = self.update(
-                    keys, train_state, inner_stack(batch), total_step
+                    keys, train_state, batched, total_step
                 )
                 output = inner_split(output)
                 pbar.set_postfix({"loss": f"{metrics['loss']:.3e}"})
 
                 _param_has_nan = lambda agg, p: jnp.isnan(p).any() | agg
                 has_nan = tree_reduce(_param_has_nan, new_train_state.params, initializer=False)
+                # has_nan = jax.tree_util.tree_map(lambda x: jnp.isnan(x).any(), new_train_state.params)
+                # for k, v in has_nan.items(): print(k, v.item())
+                # if has_nan:
+                    # breakpo'int()
                 metrics.update(dict(has_nan=has_nan))
 
                 if not has_nan and split == 'train':
@@ -230,30 +270,11 @@ class Trainer:
                     self.plot_pipe(self.run, output, batch)
                 
                 if (self.sample_every is not None) and split == 'train' and total_step % self.sample_every == 0:
-                    keys = jax.random.split(next(rng_seq), 9)
-                    start = time.time()
-                    if hasattr(self, 'sample_params'):
-                        params_ = {**train_state.params, **self.sample_params}
-                    else: 
-                        params_ = train_state.params
-                    samples = jax.vmap(self.sample_model, in_axes=(None, 0))(params_, keys)
-                    end = time.time()
-                    if total_step != 0: 
-                        metrics.update({'sample_time': end - start})
+                    sample_metrics = self.run_sample(rng_seq, train_state, batch, total_step)
+                    metrics.update(
+                        {f'{k}': v for k, v in sample_metrics.items()}
+                    )
 
-                    samples = inner_split(samples)
-                    
-                    # TODO(Allan): remove this
-                    samples = [output.replace(protein_data=inner_split(output.protein_data)) for output in samples]
-
-                    self.sample_plot(self.run, samples, None)
-
-                    if self.sample_metrics:
-                        metrics.update(
-                            self.sample_metrics(samples)
-                        )
-
-                
                 if split == 'train':
                     self.run.log(
                         {

@@ -34,7 +34,8 @@ def _setup(cfg):
     )
 
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "true" if cfg.env.preallocate else 'false'
-    os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
+    if not cfg.env.preallocate:
+        os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 
     jax.config.update("jax_debug_nans", cfg.env.debug_nans)
     jax.config.update("jax_disable_jit", cfg.env.disable_jit)
