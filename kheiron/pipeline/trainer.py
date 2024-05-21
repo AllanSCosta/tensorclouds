@@ -133,7 +133,7 @@ class Trainer:
 
     def init(self):
         print("Initializing Model...")
-        init_datum = self.dataset.splits['train'][0]
+        init_datum = self.dataset.splits['train'][0].to_dict()
 
         rng_seq = hk.PRNGSequence(self.seed)
         init_rng = next(rng_seq)
