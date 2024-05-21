@@ -24,9 +24,14 @@ class TrainState(NamedTuple):
     opt_state: Any
 
 
+
+
 def batch_dict(list_):
     keys = list_[0].keys()
     return {k: jnp.stack([d[k] for d in list_]) for k in keys if list_[0][k] is not None}
+
+
+
 
 
 class Trainer:
@@ -87,7 +92,7 @@ class Trainer:
                 self.dataset.splits[split],
                 batch_size=self.batch_size,
                 num_workers=self.num_workers,
-                collate_fn=lambda x: [x_.to_dict() for x_ in x],
+                collate_fn=lambda x: batch_dict(x),
             ) for split in self.dataset.splits
         }
 
@@ -133,7 +138,7 @@ class Trainer:
 
     def init(self):
         print("Initializing Model...")
-        init_datum = self.dataset.splits['train'][0].to_dict()
+        init_datum = self.dataset.splits['train'][0]
 
         rng_seq = hk.PRNGSequence(self.seed)
         init_rng = next(rng_seq)
@@ -247,13 +252,13 @@ class Trainer:
             epoch_metrics = defaultdict(list)
 
             for step, batch in enumerate(pbar):
-                if len(batch) != self.batch_size:
+                if batch['residue_token'].shape[0] != self.batch_size:
                     continue
-                total_step = epoch * len(loader) + step
-         
-                keys = jax.random.split(next(rng_seq), len(batch))
-                batched = batch_dict(batch)
 
+                total_step = epoch * len(loader) + step
+                keys = jax.random.split(next(rng_seq), batch['residue_token'].shape[0])
+
+                batched = batch
                 output, new_train_state, metrics = self.update(
                     keys, train_state, batched, total_step
                 )
