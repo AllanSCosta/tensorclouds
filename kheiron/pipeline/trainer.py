@@ -24,6 +24,11 @@ class TrainState(NamedTuple):
     opt_state: Any
 
 
+def batch_dict(list_):
+    keys = list_[0].keys()
+    return {k: jnp.stack([d[k] for d in list_]) for k in keys if list_[0][k] is not None}
+
+
 class Trainer:
 
     def __init__(
@@ -82,7 +87,7 @@ class Trainer:
                 self.dataset.splits[split],
                 batch_size=self.batch_size,
                 num_workers=self.num_workers,
-                collate_fn=lambda x: x,
+                collate_fn=lambda x: [x_.to_dict() for x_ in x],
             ) for split in self.dataset.splits
         }
 
@@ -247,7 +252,7 @@ class Trainer:
                 total_step = epoch * len(loader) + step
          
                 keys = jax.random.split(next(rng_seq), len(batch))
-                batched = inner_stack(batch)
+                batched = batch_dict(batch)
 
                 output, new_train_state, metrics = self.update(
                     keys, train_state, batched, total_step
