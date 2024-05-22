@@ -28,10 +28,7 @@ class TrainState(NamedTuple):
 
 def batch_dict(list_):
     keys = list_[0].keys()
-    return {k: jnp.stack([d[k] for d in list_]) for k in keys if list_[0][k] is not None}
-
-
-
+    return {k: np.stack([d[k] for d in list_]) for k in keys if list_[0][k] is not None}
 
 
 class Trainer:
@@ -92,7 +89,7 @@ class Trainer:
                 self.dataset.splits[split],
                 batch_size=self.batch_size,
                 num_workers=self.num_workers,
-                collate_fn=lambda x: batch_dict(x),
+                collate_fn=lambda x: batch_dict([batch_dict([x__.to_dict() for x__ in x_]) for x_ in x]),
             ) for split in self.dataset.splits
         }
 
@@ -138,7 +135,8 @@ class Trainer:
 
     def init(self):
         print("Initializing Model...")
-        init_datum = self.dataset.splits['train'][0]
+        # init_datum = next(iter(self.loaders['train']))
+        init_datum = batch_dict([x_.to_dict() for x_ in self.dataset.splits['train'][0]])
 
         rng_seq = hk.PRNGSequence(self.seed)
         init_rng = next(rng_seq)
