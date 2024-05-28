@@ -1,4 +1,4 @@
-#  🏹 `kheiron` - Training Camp in Jax
+#  ✨ `tensorclouds`
 
 Training Pipeline for Biomolecular Machine Learning
 
