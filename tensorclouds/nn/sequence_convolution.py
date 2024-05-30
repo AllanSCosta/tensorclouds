@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from .layer_norm import EquivariantLayerNorm
-from ..tensor_cloud import TensorCloud
+from ..tensorcloud import TensorCloud
 from .utils import up_conv_seq_len, down_conv_seq_len
 
 

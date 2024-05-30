@@ -7,12 +7,12 @@ import haiku as hk
 import jax
 import jax.numpy as jnp
 
-from model.base.residual import Residual
-from model.base.self_interaction import SelfInteraction
+from .residual import Residual
+from .self_interaction import SelfInteraction
 
 from .layer_norm import EquivariantLayerNorm
 from .profile import profile
-from ..tensor_cloud import TensorCloud 
+from ..tensorcloud import TensorCloud 
 
 
 class CompleteSpatialConvolution(hk.Module):

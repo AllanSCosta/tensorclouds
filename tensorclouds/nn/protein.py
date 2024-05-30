@@ -4,9 +4,9 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 import e3nn_jax as e3nn
-from model.base.self_interaction import SelfInteraction
+from .self_interaction import SelfInteraction
 from .utils import dotdict, safe_norm
-from ..tensor_cloud import TensorCloud 
+from ..tensorcloud import TensorCloud 
 
 from einops import rearrange, repeat
 from moleculib.protein.alphabet import (

@@ -1,12 +1,12 @@
 import e3nn_jax as e3nn
 import haiku as hk
 import jax
-from model.base.layer_norm import EquivariantLayerNorm
 
-from model.base.residual import Residual
-from model.base.self_interaction import SelfInteraction
-from model.base.sequence_convolution import SequenceConvolution
-from ..tensor_cloud import TensorCloud 
+from .layer_norm import EquivariantLayerNorm
+from .residual import Residual
+from .self_interaction import SelfInteraction
+from .sequence_convolution import SequenceConvolution
+from ..tensorcloud import TensorCloud 
 
 
 class MixingBlock(hk.Module):

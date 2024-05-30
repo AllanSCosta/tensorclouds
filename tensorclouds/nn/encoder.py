@@ -1,7 +1,7 @@
 from typing import List
 
 import jax
-from model.base.mix import MixingBlock
+from .mix import MixingBlock
 
 import e3nn_jax as e3nn
 import haiku as hk
@@ -9,7 +9,7 @@ import haiku as hk
 from .sequence_convolution import SequenceConvolution
 from .utils import multiscale_irreps
 from .layer_norm import EquivariantLayerNorm
-from ..tensor_cloud import TensorCloud 
+from ..tensorcloud import TensorCloud 
 
 from .self_interaction import SelfInteraction
 

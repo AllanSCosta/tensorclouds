@@ -35,7 +35,12 @@ class Registry:
         self.path = Path(path)
         self.source = Path(source)
 
-    def new_platform(self, cfg, tags=None) -> Platform:
+    def new_platform(
+            self, 
+            cfg, 
+            tags=None,
+            copy_repo=False,
+        ) -> Platform:
         yml_cfg = hydra_zen.to_yaml(cfg)
         cfg_dict = yaml.safe_load(yml_cfg)
         run = wandb.init(
@@ -59,11 +64,12 @@ class Registry:
             ]
             return ignore_list
 
-        shutil.copytree(
-            str(self.source / "model"),
-            str(platform_dir / "code/"),
-            ignore=ignore_files,
-        )
+        if copy_repo:
+            shutil.copytree(
+                str(self.source / "model"),
+                str(platform_dir / "code/"),
+                ignore=ignore_files,
+            )
 
         with open(f"{platform_dir}/config.yml", "w") as file:
             file.write(yml_cfg)

@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from ..tensor_cloud import TensorCloud 
+from ..tensorcloud import TensorCloud 
 
 def breakpoint_if_nonfinite(x):
     is_finite = jnp.isfinite(x).all()

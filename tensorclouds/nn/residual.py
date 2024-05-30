@@ -5,7 +5,7 @@ import e3nn_jax as e3nn
 import haiku as hk
 import jax
 
-from ..tensor_cloud import TensorCloud 
+from ..tensorcloud import TensorCloud 
 
 
 class Residual(hk.Module):

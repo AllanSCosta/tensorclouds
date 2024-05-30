@@ -4,15 +4,16 @@ import haiku as hk
 import jax.numpy as jnp
 import e3nn_jax as e3nn
 from typing import List
-from model.base.spatial_convolution import IPA, CompleteSpatialConvolution, kNNSpatialConvolution
-from model.base.self_interaction import SelfInteraction
-from ..tensor_cloud import TensorCloud 
+
+from .spatial_convolution import IPA, CompleteSpatialConvolution, kNNSpatialConvolution
+from .self_interaction import SelfInteraction
+from ..tensorcloud import TensorCloud 
 
 
 from moleculib.assembly.datum import AssemblyDatum
-from model.base.layer_norm import EquivariantLayerNorm
+from .layer_norm import EquivariantLayerNorm
 import jax
-from model.base.sequence_convolution import SequenceConvolution
+from .sequence_convolution import SequenceConvolution
 
 
 class ApproximateTimeEmbed(hk.Module):

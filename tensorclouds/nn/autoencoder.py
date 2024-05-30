@@ -4,7 +4,7 @@ import haiku as hk
 from .decoder import Decoder
 from .encoder import Encoder
 
-from ..tensor_cloud import TensorCloud 
+from ..tensorcloud import TensorCloud 
 import e3nn_jax as e3nn
 
 class Autoencoder(hk.Module):

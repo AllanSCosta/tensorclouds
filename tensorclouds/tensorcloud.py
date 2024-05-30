@@ -1,5 +1,11 @@
-from kheiron.pipeline.utils import register_pytree
+from tensorclouds.train.utils import register_pytree
 from einops import rearrange
+
+import e3nn_jax as e3nn
+import jax.numpy as jnp
+import numpy as np
+
+from typing import List
 
 class TensorCloud:
 
@@ -122,8 +128,7 @@ class TensorCloud:
                     'mid':mid, 
                     'color': colors[i]
                 }, viewer=viewer)                
-        # view.zoomTo()
-        
+        view.zoomTo()
         return view
     
     def __repr__(self) -> str:

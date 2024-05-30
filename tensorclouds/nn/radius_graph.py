@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from matscipy.neighbours import neighbour_list
 import numpy as np
 
-from ..tensor_cloud import TensorCloud 
+from ..tensorcloud import TensorCloud 
 
 def create_radius_graph(
     positions: jnp.ndarray, cutoff: float, edge_buffer_size: int

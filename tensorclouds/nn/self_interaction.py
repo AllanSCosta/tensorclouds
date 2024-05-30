@@ -11,7 +11,7 @@ from .residual import Residual
 from einops import rearrange
 import jax.numpy as jnp
 
-from ..tensor_cloud import TensorCloud 
+from ..tensorcloud import TensorCloud 
 
 class SelfInteractionUNet(hk.Module):
 
