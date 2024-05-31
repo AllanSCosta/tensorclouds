@@ -4,15 +4,93 @@ import jax.numpy as jnp
 import haiku as hk
 
 import e3nn_jax as e3nn
-from ..base.utils import TensorCloud, inner_split
-from einops import rearrange
+from tensorclouds.random.normal import NormalDistribution
+from ..tensorcloud import TensorCloud
 
 from typing import List
 
-from .so3_diffusion import SO3Diffuser
-from .r3_diffusion import R3Diffuser
-from .constants import compute_constants
-from .utils import DiffusionStepOutput
+
+
+# ==========================
+# ADAPTED BY ALLAN COSTA
+# ORIGINAL AUTHOR OF THE SNIPPET: lucidrains
+# github.com/lucidrains/denoising-diffusion-pytorch/
+# ==========================
+
+import jax
+import jax.numpy as jnp
+
+
+def linear_beta_schedule(timesteps):
+    scale = 1000 / timesteps
+    beta_start = scale * 0.0001
+    beta_end = scale * 0.02
+    return jnp.linspace(beta_start, beta_end, timesteps)
+
+def sigmoid_beta_schedule(timesteps, start=0, end=3, tau=0.3, clamp_min=1e-5):
+    steps = timesteps + 1
+    t = jnp.linspace(0, timesteps, steps, dtype=jnp.float32) / timesteps
+    v_start = jax.nn.sigmoid(jnp.array(start / tau))
+    v_end = jax.nn.sigmoid(jnp.array(end / tau))
+    alphas_cumprod = (-jax.nn.sigmoid((t * (end - start) + start) / tau) + v_end) / (
+        v_end - v_start
+    )
+    alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
+    betas = 1 - (alphas_cumprod[1:] / alphas_cumprod[:-1])
+    return jnp.clip(betas, 0, 0.999)
+
+
+def compute_constants(timesteps, start_at=1.0, scheduler=linear_beta_schedule):
+    assert start_at > 0.0 and start_at <= 1.0
+
+    betas = scheduler(int(timesteps / start_at))
+    alphas = 1.0 - betas
+
+    alphas_cumprod = jnp.cumprod(alphas, axis=0)
+    alphas_cumprod_prev = jnp.pad(alphas_cumprod[:-1], (1, 0), constant_values=1.0)
+    posterior_variance = betas * (1.0 - alphas_cumprod_prev) / (1.0 - alphas_cumprod)
+    sqrt_alphas_cumprod = jnp.sqrt(alphas_cumprod)
+    sqrt_one_minus_alphas_cumprod = jnp.sqrt(1.0 - alphas_cumprod)
+    sqrt_recip_alphas = jnp.sqrt(1.0 / alphas)
+    sqrt_recip_alphas_cumprod = jnp.sqrt(1.0 / alphas_cumprod)
+    sqrt_recipm1_alphas_cumprod = jnp.sqrt(1.0 / alphas_cumprod - 1)
+    posterior_mean_coef1 = (
+        betas * jnp.sqrt(alphas_cumprod_prev) / (1.0 - alphas_cumprod)
+    )
+    posterior_mean_coef2 = (
+        (1.0 - alphas_cumprod_prev) * jnp.sqrt(alphas) / (1.0 - alphas_cumprod)
+    )
+    posterior_log_variance_clipped = jnp.log(jnp.clip(posterior_variance, a_min=1e-20))
+    snr = alphas_cumprod / (1 - alphas_cumprod)
+    clipped_snr = jnp.clip(snr, a_max=5.0)
+    constants = dict(
+        betas=betas,
+        alphas=alphas,
+        alphas_cumprod=alphas_cumprod,
+        sqrt_alphas_cumprod=sqrt_alphas_cumprod,
+        sqrt_one_minus_alphas_cumprod=sqrt_one_minus_alphas_cumprod,
+        posterior_variance=posterior_variance,
+        sqrt_recip_alphas=sqrt_recip_alphas,
+        sqrt_recip_alphas_cumprod=sqrt_recip_alphas_cumprod,
+        sqrt_recipm1_alphas_cumprod=sqrt_recipm1_alphas_cumprod,
+        posterior_mean_coef1=posterior_mean_coef1,
+        posterior_mean_coef2=posterior_mean_coef2,
+        posterior_log_variance_clipped=posterior_log_variance_clipped,
+        snr=clipped_snr,
+        loss_weight=clipped_snr / snr,
+    )
+    for key, value in constants.items():
+        constants[key] = value[:timesteps]
+    return constants 
+
+
+import chex
+
+@chex.dataclass
+class DiffusionStepOutput:
+    noise_prediction: TensorCloud
+    noise: dict
+    reweight: float
 
 
 class TensorCloudDiffuser(hk.Module):
@@ -22,121 +100,232 @@ class TensorCloudDiffuser(hk.Module):
         feature_net: hk.Module,
         coord_net: hk.Module,
         irreps: e3nn.Irreps,
-        rescale = 10.0,
+        var_features: float,
+        var_coords: float,
         timesteps=1000,
-        start_at=1.0,
         leading_shape=(1,),
     ):
         super().__init__()
+        self.feature_net = feature_net(time_range=(0.0, timesteps))
+        self.coord_net = coord_net(time_range=(0.0, timesteps))
 
-        self.feature_net = feature_net()
-        self.coord_net = coord_net()
-
-        self.start_at = start_at
         self.num_timesteps = timesteps
         self.leading_shape = leading_shape
 
-        self.feature_diffuser = SO3Diffuser(
-            irreps=irreps,
-            timesteps=timesteps,
-            leading_shape=leading_shape,
-        )
+        self.var_features = var_features
+        self.var_coords = var_coords
 
-        self.coord_diffuser = R3Diffuser(
-            rescale=rescale,
-            timesteps=timesteps,
-            leading_shape=leading_shape,
-        )
-
-        for key, val in compute_constants(timesteps, start_at=self.start_at).items():
+        self.irreps = irreps
+        for key, val in compute_constants(timesteps, start_at=1.0).items():
             setattr(self, key, val)
-
-    def p_sample(self, z, t, cond=None, conditioners=[]):
-        feature_noise_pred = self.feature_net(z, t=t, cond=cond).irreps_array
-        coord_noise_pred = self.coord_net(z, t=t, cond=cond).coord
-
-        irreps_array = self.feature_diffuser.p_sample(z.irreps_array, t, feature_noise_pred, z.mask_irreps_array)[0]
-        coord = self.coord_diffuser.p_sample(z.coord, t, coord_noise_pred, z.mask_coord)[0]
-
-        if len(conditioners) > 0:
-            new_coord = coord
-            for conditioner in conditioners:
-                conditioner_velocity = conditioner(coord)
-                new_coord = new_coord + conditioner_velocity
-            coord = new_coord
-
-        z = TensorCloud(
-            irreps_array=irreps_array,
-            mask_irreps_array=z.mask_irreps_array,
-            coord=coord,
-            mask_coord=z.mask_coord,
+        
+        self.normal = NormalDistribution(
+            irreps_in=self.irreps,
+            irreps_mean=e3nn.zeros(self.irreps),
+            irreps_scale=self.var_features,
+            coords_mean=jnp.zeros(3),
+            coords_scale=self.var_coords,
         )
-        return z, z
 
-    def sample_prior(self):
-        xT = TensorCloud(
-            irreps_array=self.feature_diffuser.sample_prior(),
-            mask_irreps_array=jnp.ones(self.leading_shape, dtype=jnp.bool_),
-            coord=self.coord_diffuser.sample_prior(),
-            mask_coord=jnp.ones(self.leading_shape, dtype=jnp.bool_),
+    def make_prediction(
+        self, x, t, cond=None,
+    ):
+        pred_feature = self.feature_net(x, t, cond=cond)
+        pred_coord = self.coord_net(x, t, cond=cond)
+        return x.replace(
+            irreps_array=pred_feature.irreps_array,
+            coord=pred_coord.coord,
         )
-        return xT
-
+    
     def sample(
-            self, 
-            cond: e3nn.IrrepsArray = None, 
-            conditioners: List = [],
-            x0: TensorCloud = None,
-        ):
-        if x0 is not None:
-            zT, _, _ = self.q_sample(x0, self.num_timesteps - 1)
-        else:
-            zT = self.sample_prior()
+        self, 
+        cond: e3nn.IrrepsArray = None,
+    ):
+        
+        def update_one_step(xt: TensorCloud, t: float) -> TensorCloud:      
+            z = self.normal.sample(
+                hk.next_rng_key(), 
+                leading_shape=self.leading_shape
+            )
+            
+            ϵ̂ = self.make_prediction(xt, t, cond=cond)
 
+            αt = self.alphas[t]
+            ᾱt = self.alphas_cumprod[t]
+            σt = jnp.exp(0.5 * self.posterior_log_variance_clipped[t])
+
+            sqrt = lambda x: jnp.sqrt(jnp.maximum(x, 1e-6)) 
+            
+            next_xt = (1/sqrt(αt)) * (xt + (-((1 - αt) / sqrt(1 - ᾱt))) * ϵ̂).centralize() + (t != 0) * σt * z
+
+            return next_xt, next_xt
+
+        zT = self.normal.sample(
+            hk.next_rng_key(), 
+            leading_shape=self.leading_shape
+        )
         return hk.scan(
-            functools.partial(self.p_sample, conditioners=conditioners, cond=cond),
+            update_one_step,
             zT,
             jnp.arange(0, self.num_timesteps)[::-1],
         )
 
-    def q_sample(self, z0, t: int):
-        features, so3_noise = self.feature_diffuser.q_sample(z0.irreps_array, z0.mask_irreps_array, t)
-        coord, coord_noise = self.coord_diffuser.q_sample(z0.coord, z0.mask_coord, t)
-        z0 = TensorCloud(
-            irreps_array=features,
-            mask_irreps_array=z0.mask_irreps_array,
-            coord=coord,
-            mask_coord=z0.mask_coord,
+    def q_sample(self, x0, t: int):
+        z = self.normal.sample(
+            hk.next_rng_key(),
+            leading_shape=self.leading_shape,
+            mask=x0.mask_irreps_array,
         )
-        return z0, so3_noise, coord_noise
+        return (
+            self.sqrt_alphas_cumprod[t] * x0
+            + self.sqrt_one_minus_alphas_cumprod[t] * z
+        ), z
 
     def __call__(
-            self, 
-            x0: TensorCloud, 
-            cond: e3nn.IrrepsArray = None,
-            is_training = False
-        ):
+        self, 
+        x0: TensorCloud, 
+        cond: e3nn.IrrepsArray = None,
+        is_training = False
+    ):
         t = jax.random.randint(hk.next_rng_key(), (), 0, self.num_timesteps)
-
-        xt, feature_noise, coord_noise = self.q_sample(x0, t)
-        feature_noise_pred = self.feature_net(xt, t=t, cond=cond).irreps_array
-        coord_noise_pred = self.coord_net(xt, t=t, cond=cond).coord
+        
+        x0 = x0.centralize()
+        xt, z = self.q_sample(x0, t)
+        ẑ = self.make_prediction(xt, t, cond=cond)
 
         return DiffusionStepOutput(
-            noise_prediction=TensorCloud(
-                irreps_array=feature_noise_pred,
-                mask_irreps_array=x0.mask_irreps_array,
-                coord=coord_noise_pred,
-                mask_coord=x0.mask_irreps_array,
-            ),
-            noise=TensorCloud(
-                irreps_array=feature_noise,
-                mask_irreps_array=x0.mask_irreps_array,
-                coord=coord_noise,
-                mask_coord=x0.mask_irreps_array,
-            ),
+            noise_prediction=ẑ,
+            noise=z,
             reweight=self.loss_weight[t][None]
         )
 
 
 
+
+
+
+
+
+class R3Diffuser(hk.Module):
+    def __init__(
+        self,
+        rescale = 5.0,
+        timesteps=1000,
+        leading_shape=(14,),
+    ):
+        super().__init__()
+        self.leading_shape = leading_shape
+        self.rescale = rescale
+
+        self.num_timesteps = timesteps
+        for key, val in compute_constants(timesteps).items():
+            setattr(self, key, val)
+
+    def p_sample(self, z, t, noise_pred, mask):
+        
+        return z, z
+
+    def q_sample(self, z0, mask, t: int):
+        z0 = _centralize_coord(z0, mask)
+        coord_noise = jax.random.normal(
+            hk.next_rng_key(), 
+            self.leading_shape + (3,)
+        ).astype(z0.dtype)
+        coord_noise = coord_noise * self.rescale
+        coord_noise = coord_noise * mask[..., None]
+        return (
+            self.sqrt_alphas_cumprod[t] * z0
+            + self.sqrt_one_minus_alphas_cumprod[t] * coord_noise
+        ), coord_noise
+
+    def sample_prior(self):
+        zT = jax.random.normal(
+            hk.next_rng_key(), 
+            self.leading_shape + (3,)
+         ) * self.rescale
+        return zT
+
+    def sample(self, mask):
+        return hk.scan(
+            functools.partial(self.p_sample, mask=mask),
+            self.sample_prior(),
+            jnp.arange(0, self.num_timesteps)[::-1],
+        )
+
+    def __call__(self, z0, mask):
+        t = jax.random.randint(hk.next_rng_key(), (), 0, self.num_timesteps)
+        z0 = _centralize_coord(z0, mask)   
+        zt, noise = self.q_sample(z0, t)
+        state = self.time_embed(zt, t)
+        noise_pred = self.f(state)
+        return self.loss(noise_pred, noise, z0.mask_coord, t)  
+    
+
+
+
+class SO3Diffuser(hk.Module):
+
+    def __init__(
+        self,
+        irreps: e3nn.Irreps,
+        timesteps=1000,
+        leading_shape=(1,),
+        f=None
+    ):
+        super().__init__()
+        self.irreps = irreps
+        self.leading_shape = leading_shape
+
+        self.num_timesteps = timesteps
+        for key, val in compute_constants(timesteps).items():
+            setattr(self, key, val)
+
+    def p_sample(self, z: e3nn.IrrepsArray, t: int, noise_pred: e3nn.IrrepsArray, mask: jnp.ndarray):
+        z0_pred = (
+            self.sqrt_recip_alphas_cumprod[t] * z -
+            self.sqrt_recipm1_alphas_cumprod[t] * noise_pred
+        )
+
+        mean = (
+            self.posterior_mean_coef1[t] * z0_pred
+            + self.posterior_mean_coef2[t] * z
+        ) 
+
+        noise = e3nn.normal(
+            self.irreps, hk.next_rng_key(), self.leading_shape
+        )
+        log_var = self.posterior_log_variance_clipped[t]
+        z = (mean + jnp.exp(0.5 * log_var) * noise * (jnp.array([t]) > 0)[..., None])
+        z = z * mask[..., None]
+
+        return z, z
+
+    def sample_prior(self):
+        zT = e3nn.normal(self.irreps, hk.next_rng_key(), self.leading_shape)
+        return zT
+
+    def sample(self):
+        return hk.scan(
+            functools.partial(self.p_sample),
+            self.sample_prior(),
+            jnp.arange(0, self.num_timesteps)[::-1],
+        )
+
+    def q_sample(self, z0, mask: jnp.ndarray, t: int):
+        noise = e3nn.normal(
+            self.irreps,
+            hk.next_rng_key(),
+            self.leading_shape,
+            dtype=z0.dtype,
+        ) * mask[..., None]
+        zt = (
+            self.sqrt_alphas_cumprod[t] * z0
+            + self.sqrt_one_minus_alphas_cumprod[t] * noise
+        )
+        return zt, noise
+
+    def __call__(self, z0: e3nn.IrrepsArray, condition: e3nn.IrrepsArray = None):
+        t = jax.random.randint(hk.next_rng_key(), (), 0, self.num_timesteps)
+        zt, noise = self.q_sample(z0, t)
+        noise_pred = self.f(zt, t)
+        return self.loss(noise_pred, noise, t)

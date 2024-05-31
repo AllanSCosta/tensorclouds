@@ -38,15 +38,21 @@ class ApproximateTimeEmbed(hk.Module):
 
 
 class OnehotTimeEmbed(hk.Module):
-    def __init__(self, timesteps: int):
+    def __init__(self, timesteps: int, time_range=(0.0, 1.0)):
         super().__init__()
         self.timesteps = timesteps
+        self.time_range = time_range
 
     def __call__(self, state: TensorCloud, t: float) -> TensorCloud:
         irreps_array = state.irreps_array
         mask = state.mask
         t_emb = e3nn.soft_one_hot_linspace(
-            t, start=0.0, end=1.0, number=self.timesteps, basis="cosine", cutoff=True
+            t.astype(jnp.float32),
+            start=self.time_range[0], 
+            end=self.time_range[1], 
+            number=self.timesteps, 
+            basis="cosine", 
+            cutoff=True
         )
 
         t_emb = t_emb * mask[..., None]
@@ -66,13 +72,14 @@ class Denoiser(hk.Module):
         k_seq: int = 0,
         radial_cut = 32.0,
         timesteps = 100,
+        time_range = (0.0, 1.0),
         full_square=False,
         conservative=False,
     ):
         super().__init__()
         self.layers = layers
         self.radial_cut = radial_cut
-        self.time_embed = OnehotTimeEmbed(timesteps)
+        self.time_embed = OnehotTimeEmbed(timesteps, time_range=time_range)
         self.full_square=full_square
         self.conservative = conservative
         self.k = k

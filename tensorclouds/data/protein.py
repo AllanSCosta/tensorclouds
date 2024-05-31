@@ -4,8 +4,8 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 import e3nn_jax as e3nn
-from .self_interaction import SelfInteraction
-from .utils import dotdict, safe_norm
+from ..nn.self_interaction import SelfInteraction
+from ..nn.utils import dotdict, safe_norm
 from ..tensorcloud import TensorCloud 
 
 from einops import rearrange, repeat

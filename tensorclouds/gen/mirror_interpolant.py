@@ -17,12 +17,6 @@ class NoisePrediction:
     noise_prediction: TensorCloud
     noise: TensorCloud
 
-@chex.dataclass
-class DriftPrediction:
-    drift_prediction: TensorCloud
-    drift: dict
-    
-
 
 class TensorCloudMirrorInterpolant(hk.Module):
 
@@ -42,10 +36,7 @@ class TensorCloudMirrorInterpolant(hk.Module):
         self.coord_net = coord_net()
                 
         self.var_features = var_features
-        self.var_coords = var_coords
-        
-        self.prediction_type = 'velocity'
-
+        self.var_coords = var_coords  
 
     def make_prediction(
         self, x, t, cond=None,

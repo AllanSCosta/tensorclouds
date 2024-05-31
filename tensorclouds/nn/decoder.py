@@ -4,19 +4,18 @@ from typing import List, Tuple
 from .mix import MixingBlock
 from .self_interaction import SelfInteraction
 
+
 import e3nn_jax as e3nn
 import haiku as hk
 import jax.numpy as jnp
 
-from .protein import tensor_cloud_to_protein
 from .sequence_convolution import SequenceConvolution
 from .mix import MixingBlock
 from moleculib.protein.datum import ProteinDatum
 from .layer_norm import EquivariantLayerNorm
 
 from ..tensorcloud import TensorCloud 
-from .utils import inner_split, multiscale_irreps
-
+from .utils import multiscale_irreps
 
 class DecoderBlock(hk.Module):
     def __init__(

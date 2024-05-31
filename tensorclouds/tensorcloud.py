@@ -104,6 +104,13 @@ class TensorCloud:
             start += piece
         return tensor_clouds
 
+    def centralize(self):
+        coord, mask = self.coord, self.mask_coord
+        center = (coord * mask[..., None]).sum(-2) / mask.sum(-1)
+        coord = (coord - center[None, ...]) * mask[..., None]
+        coord = jnp.where(jnp.isnan(coord), 0.0, coord)
+        return self.replace(coord=coord)
+
     def plot(self, view, viewer=None, colors=None, radius=0.04, mid=0.95):
         if viewer is None:
             viewer = (0, 0)
