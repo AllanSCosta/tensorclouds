@@ -23,7 +23,7 @@ class CompleteSpatialConvolution(hk.Module):
         radial_cut: float,
         radial_bins: int = 32,
         radial_basis: str = "gaussian",
-        edge_irreps: e3nn.Irreps = e3nn.Irreps("0e + 1e + 2e"),
+        edge_irreps: e3nn.Irreps = e3nn.Irreps("0e + 1o + 2e"),
         norm: bool = True,
         k_seq: int = 16,
         attention: bool = False,
@@ -119,7 +119,7 @@ class CompleteSpatialConvolution(hk.Module):
         features = e3nn.haiku.Linear(self.irreps_out)(features_aggr)
         
         if self.move:
-            update = 1e-3 * e3nn.haiku.Linear("1e")(features).array
+            update = 1e-3 * e3nn.haiku.Linear("1o")(features).array
             new_coord = state.coord + update
             state = state.replace(coord=new_coord)
 

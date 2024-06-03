@@ -63,6 +63,8 @@ class OnehotTimeEmbed(hk.Module):
         return state.replace(irreps_array=irreps_array)
 
 
+import einops as ein
+
 class Denoiser(hk.Module):
 
     def __init__(
@@ -75,6 +77,7 @@ class Denoiser(hk.Module):
         time_range = (0.0, 1.0),
         full_square=False,
         conservative=False,
+        move=False,
     ):
         super().__init__()
         self.layers = layers
@@ -84,12 +87,24 @@ class Denoiser(hk.Module):
         self.conservative = conservative
         self.k = k
         self.k_seq = k_seq
-        
+        self.move = False
+
     def mix(self, x, t, cond):
 
         if cond is not None:
-            x = x.replace(irreps_array=e3nn.concatenate([x.irreps_array, cond], axis=-1).regroup())
+            x = x.replace(irreps_array=e3nn.concatenate([x.irreps_array, cond], axis=-1).regroup())                
         
+        # frame = jnp.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+        # frame = ein.repeat(frame, 'e c -> n (e c)', n=x.irreps_array.shape[0])
+        # reference_frame = e3nn.IrrepsArray(
+        #     "3x1e", frame)
+        # x = x.replace(
+        #     irreps_array=e3nn.concatenate(
+        #         (x.irreps_array, reference_frame), axis=-1
+        #     ).regroup()
+        # )
+
+
         # first mix
         x = SelfInteraction(
             [self.layers[0]],
@@ -128,7 +143,7 @@ class Denoiser(hk.Module):
 
             x = SelfInteraction(
                 [irreps],
-                full_square=False,
+                full_square=self.full_square,
                 norm_last=True,
             )(x)
 
@@ -141,7 +156,7 @@ class Denoiser(hk.Module):
                     radial_cut=self.radial_cut,
                     radial_bins=32,
                     radial_basis='gaussian',
-                    move=False,
+                    move=self.move,
                 )(x)
             else:
                 x = CompleteSpatialConvolution(
@@ -149,7 +164,7 @@ class Denoiser(hk.Module):
                     radial_cut=self.radial_cut,
                     radial_bins=32,
                     k_seq=self.k_seq,
-                    move=False,
+                    move=self.move,
                 )(x)
 
             x = x.replace(
@@ -180,13 +195,16 @@ class Denoiser(hk.Module):
             norm_last=False,
             full_square=True,
         )(x)
-        coord_out = SelfInteraction(
-            ['1x0e + 1x1e'],
-            full_square=True,
-            norm=False,
-            norm_last=False,
-        )(x).irreps_array.filter('1e').array
-        return tc_out.replace(coord=coord_out)
+        if not self.move:
+            coord_out = SelfInteraction(
+                ['1x0e + 1x1e'],
+                full_square=True,
+                norm=False,
+                norm_last=False,
+            )(x).irreps_array.filter('1e').array
+            tc_out = tc_out.replace(coord=coord_out)
+
+        return tc_out
 
     def predict_energy(self, x, t, cond=None):
         x = self.mix(x, t, cond=cond)

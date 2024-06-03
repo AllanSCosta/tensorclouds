@@ -87,9 +87,9 @@ def compute_constants(timesteps, start_at=1.0, scheduler=linear_beta_schedule):
 import chex
 
 @chex.dataclass
-class DiffusionStepOutput:
-    noise_prediction: TensorCloud
-    noise: dict
+class ModelPrediction:
+    prediction: TensorCloud
+    target: dict
     reweight: float
 
 
@@ -193,8 +193,8 @@ class TensorCloudDiffuser(hk.Module):
         xt, z = self.q_sample(x0, t)
         ẑ = self.make_prediction(xt, t, cond=cond)
 
-        return DiffusionStepOutput(
-            noise_prediction=ẑ,
-            noise=z,
+        return ModelPrediction(
+            prediction=ẑ,
+            target=z,
             reweight=self.loss_weight[t][None]
         )

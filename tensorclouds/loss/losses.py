@@ -145,37 +145,69 @@ class StepInterpolantLoss(LossFunction):
         return model_output, feature_loss_d + coord_loss_d + feature_loss_z + coord_loss_z, { 'feature_loss_d': feature_loss_d, 'coord_loss_d': coord_loss_d, 'feature_loss_z': feature_loss_z, 'coord_loss_z': coord_loss_z }
 
 
-class LatentDiffusionLoss(LossFunction):
-
-    def feature_loss(self, pred, target, mask):
-        loss = 0.0
-        for vl_hat, vl in zip(pred.list, target.list):
-            l_loss = jnp.square(vl_hat - vl).sum(-1) 
-            l_loss = (l_loss * mask[..., None]).sum((-1, -2)) / (mask.sum((-1)) + 1e-6)
-            l_loss = l_loss * (mask.sum(-1) > 0)
-            loss += l_loss
-        return loss
-    
-    def coord_loss(self, pred, target, mask):
-        loss = jnp.square(pred - target).sum(-1)
-        loss = (loss * mask).sum() / (mask.sum() + 1e-6)
-        loss = loss * (mask.sum() > 0)
-        return loss
+class TensorCloudMatchingLoss(LossFunction):
 
     def _call(
         self, rng_key, model_output: ModelOutput, _: ProteinDatum
     ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
-        pred, noise = model_output.noise_prediction, model_output.noise
+        pred, target = model_output.prediction, model_output.target
         reweight = jax.lax.stop_gradient(model_output.reweight)
-        features_loss = self.feature_loss(pred=pred.irreps_array, target=noise.irreps_array, mask=noise.mask_irreps_array)
-        features_loss = features_loss * reweight
 
-        coord_loss = self.coord_loss(pred=pred.coord, target=noise.coord, mask=noise.mask_coord)
-        coord_loss = coord_loss * reweight
-        
+        features_loss = jnp.square(pred.irreps_array.array - target.irreps_array.array)
+        features_loss = reweight * features_loss
+        features_loss = jnp.mean(features_loss * target.mask_irreps_array[:, None])
+
+        coord_loss = jnp.square(pred.coord - target.coord)
+        coord_loss = reweight * coord_loss
+        coord_loss = jnp.mean(coord_loss * target.mask_coord[:, None])
+
         metrics = dict(features_loss=features_loss, coord_loss=coord_loss)
-
         return model_output, features_loss + coord_loss, metrics        
+
+
+class VectorCloudMatchingLoss(LossFunction):
+
+    def _call(
+        self, rng_key, model_output: ModelOutput, _: ProteinDatum
+    ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
+        pred, target = model_output.prediction, model_output.target
+
+        vec_irreps = '1o'
+        pred_vectors = rearrange(pred.irreps_array.filter(vec_irreps).array, '... (v e) -> ... v e', e=3)
+        target_vectors = rearrange(target.irreps_array.filter(vec_irreps).array, '... (v e) -> ... v e', e=3)
+        vec_mask = repeat(target.mask_coord, 'r -> r v', v=pred_vectors.shape[-2])
+
+        pred_vectors = pred_vectors + pred.coord[:, None, :]
+        target_vectors = target_vectors + target.coord[:, None, :]
+
+        pred_vectors = rearrange(pred_vectors, 'r v ... -> (r v) ...')        
+        target_vectors = rearrange(target_vectors, 'r v ... -> (r v) ...')
+        vec_mask = rearrange(vec_mask, 'r v -> (r v)')
+        
+        def ij_map(x, distance=True):
+            x_ij = rearrange(x, '... i c -> ... i () c') - rearrange(x, '... j c -> ... () j c')
+            return safe_norm(x_ij)[..., None] if distance else x_ij
+
+        pred_dist_map = ij_map(pred_vectors)
+        target_dist_map = ij_map(target_vectors)
+
+        cross_mask = rearrange(vec_mask, 'i -> i ()') & rearrange(vec_mask, 'j -> () j')        
+        vectors_loss = jnp.square(pred_dist_map - target_dist_map)
+
+        vectors_loss = jnp.sum(vectors_loss * cross_mask[..., None]) / (jnp.sum(cross_mask) + 1e-6)
+
+        pred_coord_dist_map = ij_map(pred.coord)
+        target_coord_dist_map = ij_map(target.coord)
+
+        cross_mask = rearrange(target.mask_coord, 'r -> r ()') & rearrange(target.mask_coord, 'r -> () r')
+        coord_loss = jnp.square(pred_coord_dist_map - target_coord_dist_map)
+
+        coord_loss = jnp.sum(coord_loss * cross_mask[..., None]) / (jnp.sum(cross_mask) + 1e-6)
+
+
+        return model_output, vectors_loss + coord_loss, { 'vectors_loss': vectors_loss, 'coord_loss': coord_loss }
+
+
 
 class InternalVectorLoss(LossFunction):
     def __init__(self, weight=1.0, start_step=0, norm_only=False):
