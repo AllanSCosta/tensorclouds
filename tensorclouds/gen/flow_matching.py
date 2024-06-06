@@ -125,6 +125,8 @@ class TensorCloudFlowMatcher(hk.Module):
             x̂t = self.make_prediction(xt, t, cond=cond)      
             next_xt = ((s - t) / (1 - t)) * x̂t + ((1 - s) / (1 - t)) * xt
             next_xt = (s < 1.) * next_xt + (s >= 1.) * x̂t
+            # v̂t = self.make_prediction(xt, t, cond=cond) 
+            # next_xt = xt + dt * v̂t
             return next_xt, next_xt
 
         x0 = self.normal.sample(
@@ -137,16 +139,16 @@ class TensorCloudFlowMatcher(hk.Module):
             jnp.arange(0, 1, dt),
         )
 
-    def q_sample(self, x1, t: int, sigma_min: float = 1e-2):
+    def p_t(self, x1, t: int, sigma_min: float = 1e-2):
         x0 = self.normal.sample(
             hk.next_rng_key(),
             leading_shape=self.leading_shape,
             mask=x1.mask_irreps_array,
         )
         x0 = x0.centralize()
-        # x0, x1  = align_with_rotation(x0, x1) 
         xt = t * x1 + (1 - t) * x0
-        return xt
+        vt = (x1 + (-x0))
+        return xt, vt
     
     def __call__(
         self, 
@@ -157,10 +159,15 @@ class TensorCloudFlowMatcher(hk.Module):
         t = jax.random.randint(hk.next_rng_key(), (), 0, self.num_timesteps)
         
         x1 = x1.centralize()
-        xt = self.q_sample(x1, t)
+        xt, v1 = self.p_t(x1, t)
         x̂1 = self.make_prediction(xt, t, cond=cond)
 
+        # xt, vt = self.p_t(x1, t)
+        # v̂t = self.make_prediction(xt, t, cond=cond)
+
         return ModelPrediction(
+            # prediction=v̂t,
+            # target=vt,
             prediction=x̂1,
             target=x1,
             reweight=1

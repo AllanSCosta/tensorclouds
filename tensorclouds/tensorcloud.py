@@ -135,7 +135,7 @@ class TensorCloud:
                     'mid':mid, 
                     'color': colors[i]
                 }, viewer=viewer)                
-        view.zoomTo()
+        # view.zoomTo()
         return view
     
     def __repr__(self) -> str:

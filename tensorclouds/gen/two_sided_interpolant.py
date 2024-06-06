@@ -8,19 +8,19 @@ import e3nn_jax as e3nn
 
 from ..tensorcloud import TensorCloud
 from ..random.normal import NormalDistribution
-from .r3_diffusion import _centralize_coord
+
 
 import chex
 
 @chex.dataclass
 class NoisePrediction:
-    noise_prediction: TensorCloud
-    noise: TensorCloud
+    prediction: TensorCloud
+    target: TensorCloud
 
 @chex.dataclass
 class DriftPrediction:
-    drift_prediction: TensorCloud
-    drift: dict
+    prediction: TensorCloud
+    target: dict
     
 
 class TensorCloudStepInterpolant(hk.Module):
@@ -45,6 +45,7 @@ class TensorCloudStepInterpolant(hk.Module):
         self.feature_drift = feature_drift()
         self.coord_drift = coord_drift()
 
+        
         self.feature_denoise = feature_denoise()
         self.coord_denoise = coord_denoise()
     
@@ -60,8 +61,8 @@ class TensorCloudStepInterpolant(hk.Module):
             self.gamma_dot = lambda t: (1/(2*jnp.sqrt(t*(1-t)+1e-2))) * (1-2*t)        
             self.dtIt = lambda x0, x1: -x0 + x1
         elif scheduler == 'bsquare':
-            self.gamma = lambda t: t*(1-t)
-            self.gamma_dot = lambda t: 1 -2*t
+            self.gamma = lambda t: t*(1-t) + 1e-4
+            self.gamma_dot = lambda t: 1-2*t + 1e-4
             self.dtIt = lambda x0, x1: -x0 + x1
 
 
@@ -113,16 +114,21 @@ class TensorCloudStepInterpolant(hk.Module):
             denoise = - ((eps / self.gamma(t)) * dt) * z_hat
             noise = jnp.sqrt(2 * eps) * dW
 
-            next_zt = zt + drift + (t < 0.8) * (t > 0.2) * (denoise + noise)
+            next_zt = zt + drift + (t < 0.99) * (t > 0.01) * (denoise + noise)
+            next_zt = next_zt.centralize()
 
             next_zt = next_zt.replace(
-                coord=_centralize_coord(next_zt.coord, next_zt.mask_coord)
+                irreps_array=e3nn.IrrepsArray(
+                    next_zt.irreps_array.irreps,
+                    next_zt.irreps_array.array * (zt.irreps_array.array != 0.0)
+                )
             )
+
             return next_zt, next_zt
 
         return hk.scan(
             update_one_step,
-            self.sample_base_distribution() if x0 is None else x0,
+            x0,
             jnp.linspace(0, 1, num_steps),
         )
 
@@ -160,27 +166,26 @@ class TensorCloudStepInterpolant(hk.Module):
     ):
         # Sample time.
         t = jax.random.uniform(hk.next_rng_key())
-
-        x0 = x0.replace(coord=_centralize_coord(x0.coord, mask=x0.mask_coord))
-        x1 = x1.replace(coord=_centralize_coord(x1.coord, mask=x1.mask_coord))
+        x0 = x0.centralize()
+        x1 = x1.centralize()
 
         # Compute xt at time t.
         xt, z = self.compute_xt(t, x0, x1)
+        drift = (self.dtIt(x0, x1) + self.gamma_dot(t) * z)
 
         # Compute the predicted velocity ut(xt) at time t and location xt.
-        noise_pred = self.predict_denoise(xt, t, cond=cond)
         drift_pred = self.predict_drift(xt, t, cond=cond)
+        noise_pred = self.predict_denoise(xt, t, cond=cond)
 
-        drift = (self.dtIt(x0, x1) + self.gamma_dot(t) * z)
 
         return (
             NoisePrediction(
-                noise_prediction=noise_pred,
-                noise=z
+                prediction=noise_pred,
+                target=z
             ),
             DriftPrediction(
-                drift_prediction=drift_pred,
-                drift=drift
+                prediction=drift_pred,
+                target=drift
             )
         )
         

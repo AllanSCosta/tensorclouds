@@ -150,18 +150,45 @@ class TensorCloudMatchingLoss(LossFunction):
     def _call(
         self, rng_key, model_output: ModelOutput, _: ProteinDatum
     ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
+        
+        if type(model_output) == tuple:
+            aggr_loss = 0.0
+            metrics = defaultdict(float)
+            for output in model_output:
+                _, loss_, metrics_ = self._call(rng_key, output, _)
+                name = re.sub(r"(?<!^)(?=[A-Z])", "_", type(output).__name__).lower()
+                aggr_loss += loss_
+                for key, value in metrics_.items():
+                    metrics[name + '_' + key] = value
+            return model_output, aggr_loss, metrics
+
         pred, target = model_output.prediction, model_output.target
-        reweight = jax.lax.stop_gradient(model_output.reweight)
+        if hasattr(model_output, 'reweight'):
+            reweight = jax.lax.stop_gradient(model_output.reweight)
+        else:
+            reweight = 1.0
 
         features_loss = jnp.square(pred.irreps_array.array - target.irreps_array.array)
         features_loss = reweight * features_loss
-        features_loss = jnp.mean(features_loss * target.mask_irreps_array[:, None])
+        features_loss = jnp.sum(features_loss)
+
+        features_pred_norm = jnp.square(pred.irreps_array.array).sum(-1)
+        features_pred_norm = jnp.mean(features_pred_norm)
+
+        features_target_norm = jnp.square(target.irreps_array.array).sum(-1)
+        features_target_norm = jnp.mean(features_target_norm) 
 
         coord_loss = jnp.square(pred.coord - target.coord)
         coord_loss = reweight * coord_loss
-        coord_loss = jnp.mean(coord_loss * target.mask_coord[:, None])
+        coord_loss = jnp.sum(coord_loss)
 
-        metrics = dict(features_loss=features_loss, coord_loss=coord_loss)
+        metrics = dict(
+            features_loss=features_loss, 
+            features_pred_norm=features_pred_norm,
+            features_target_norm=features_target_norm,
+            coord_loss=coord_loss
+        )
+
         return model_output, features_loss + coord_loss, metrics        
 
 

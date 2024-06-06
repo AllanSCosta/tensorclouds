@@ -114,21 +114,6 @@ class Denoiser(hk.Module):
 
         x = self.time_embed(x, t)
 
-        pos = hk.Embed(
-            vocab_size=x.irreps_array.shape[0], 
-            embed_dim=x.irreps_array.filter('0e').shape[-1]
-        )(jnp.arange(x.irreps_array.shape[0]))
-
-        pos = e3nn.IrrepsArray(
-            f"{x.irreps_array.filter('0e').shape[-1]}x0e", pos
-        )
-
-        x = x.replace(
-            irreps_array=e3nn.concatenate((
-                x.irreps_array, pos
-            ), axis=-1).regroup() * x.mask_irreps_array[..., None]
-        )
-
         # second mix
         x = SelfInteraction(
             [self.layers[0]],
@@ -179,10 +164,8 @@ class Denoiser(hk.Module):
             states.append(x.irreps_array)
 
         x = x.replace(
-            irreps_array=EquivariantLayerNorm()(
-                e3nn.haiku.Linear(self.layers[-2])(
-                    e3nn.concatenate(states, axis=-1).regroup()
-                )
+            irreps_array=e3nn.haiku.Linear(self.layers[-2])(
+                e3nn.concatenate(states, axis=-1).regroup()
             )
         )
         return x

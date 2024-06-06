@@ -7,7 +7,6 @@ import haiku as hk
 import e3nn_jax as e3nn
 
 from ..tensorcloud import TensorCloud
-from .r3_diffusion import _centralize_coord
 from ..random.normal import NormalDistribution
 
 import chex
@@ -86,9 +85,7 @@ class TensorCloudMirrorInterpolant(hk.Module):
 
             next_zt = zt + drift + (t < 0.9) * (t > 0.1) * (denoise + noise) 
 
-            next_zt = next_zt.replace(
-                coord=_centralize_coord(next_zt.coord, next_zt.mask_coord)
-            )
+            next_zt = next_zt.centralize()
             return next_zt, next_zt
 
         return hk.scan(
@@ -125,7 +122,7 @@ class TensorCloudMirrorInterpolant(hk.Module):
     ):
         t = jax.random.uniform(hk.next_rng_key())
 
-        x0 = x0.replace(coord=_centralize_coord(x0.coord, mask=x0.mask_coord))
+        x0 = x0.centralize()
         xt, z = self.compute_xt(t, x0)
 
         pred = self.make_prediction(xt, t, cond=cond)

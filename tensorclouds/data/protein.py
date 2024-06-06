@@ -341,7 +341,7 @@ def protein_to_tensor_cloud(protein):
     vectors = rearrange(vectors, 'r a c -> r (a c)')
 
     irreps_array = e3nn.IrrepsArray(
-        '23x0e + 14x1o', 
+        '23x0e + 14x1e', 
         jnp.concatenate([scalars, vectors], axis=-1)
     )
 
@@ -360,10 +360,10 @@ def tensor_cloud_to_protein(state, protein=None, backbone_only=False):
     ca_coord = state.coord
     res_mask = state.mask_coord
 
-    if (str(irreps_array.irreps) == '23x0e+14x1o'):
+    if (str(irreps_array.irreps) == '23x0e+14x1e'):
         res_logits = jax.nn.softmax(irreps_array.filter('0e').array)
         eos_logits = None
-    elif (str(irreps_array.irreps) == '14x1o'):
+    elif (str(irreps_array.irreps) == '14x1e'):
         res_logits = None
         eos_logits = None
     else:
@@ -378,9 +378,9 @@ def tensor_cloud_to_protein(state, protein=None, backbone_only=False):
             logits[..., -1],
             logits[..., -2],
         )
-        irreps_array = e3nn.haiku.Linear('14x1o')(irreps_array)
+        irreps_array = e3nn.haiku.Linear('14x1e')(irreps_array)
 
-    atom_coord = irreps_array.filter("1o").array
+    atom_coord = irreps_array.filter("1e").array
     atom_coord = rearrange(atom_coord, 'r (a c) -> r a c', a=14)
         
 
@@ -404,6 +404,7 @@ def tensor_cloud_to_protein(state, protein=None, backbone_only=False):
         
     atom_coord = atom_coord.at[..., 1, :].set(0.0)
     atom_coord = atom_coord + ca_coord[..., None, :]
+    atom_coord = atom_coord * atom_mask[..., None]
 
     return dict(
         idcode=None,

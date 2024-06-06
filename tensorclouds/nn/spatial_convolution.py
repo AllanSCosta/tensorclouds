@@ -23,7 +23,7 @@ class CompleteSpatialConvolution(hk.Module):
         radial_cut: float,
         radial_bins: int = 32,
         radial_basis: str = "gaussian",
-        edge_irreps: e3nn.Irreps = e3nn.Irreps("0e + 1o + 2e"),
+        edge_irreps: e3nn.Irreps = e3nn.Irreps("0e + 1e + 2e"),
         norm: bool = True,
         k_seq: int = 16,
         attention: bool = False,
@@ -77,9 +77,20 @@ class CompleteSpatialConvolution(hk.Module):
         )
         ang_embed = ang_embed * cross_mask[..., None].astype(ang_embed.array.dtype)
 
-        messages = e3nn.haiku.Linear(self.irreps_out)(
-            e3nn.concatenate([e3nn.tensor_product(ang_embed, features_j), ang_embed, features_j], axis=-1).regroup()
+        messages_i = e3nn.haiku.Linear(self.irreps_out)(
+            e3nn.tensor_product(ang_embed, features_i)
         )
+
+        messages_j = e3nn.haiku.Linear(self.irreps_out)(
+            e3nn.tensor_product(ang_embed, features_j)
+        )
+
+
+        messages = e3nn.concatenate([
+            messages_i,
+            messages_j,
+            ang_embed, 
+        ], axis=-1).regroup()
 
         # Radial part:
         rad_embed = e3nn.soft_one_hot_linspace(
@@ -119,7 +130,7 @@ class CompleteSpatialConvolution(hk.Module):
         features = e3nn.haiku.Linear(self.irreps_out)(features_aggr)
         
         if self.move:
-            update = 1e-3 * e3nn.haiku.Linear("1o")(features).array
+            update = 1e-3 * e3nn.haiku.Linear("1e")(features).array
             new_coord = state.coord + update
             state = state.replace(coord=new_coord)
 
