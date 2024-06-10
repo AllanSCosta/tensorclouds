@@ -5,6 +5,7 @@ import haiku as hk
 
 import e3nn_jax as e3nn
 from tensorclouds.random.normal import NormalDistribution
+from tensorclouds.random.harmonic import HarmonicDistribution
 from ..tensorcloud import TensorCloud
 
 from typing import List
@@ -69,7 +70,6 @@ def align_with_rotation(
     )
     return x0, x1
 
-# -> Kabsch algorithm
 
 
 class TensorCloudFlowMatcher(hk.Module):
@@ -95,13 +95,20 @@ class TensorCloudFlowMatcher(hk.Module):
         self.var_coords = var_coords
 
         self.irreps = irreps        
-        self.normal = NormalDistribution(
+        self.dist = NormalDistribution(
             irreps_in=self.irreps,
             irreps_mean=e3nn.zeros(self.irreps),
             irreps_scale=self.var_features,
             coords_mean=jnp.zeros(3),
             coords_scale=self.var_coords,
         )
+
+        # self.dist = HarmonicDistribution(
+        #     irreps=self.irreps,
+        #     var_features=self.var_features,
+        #     N = leading_shape[-1],
+        # )
+
 
     def make_prediction(
         self, x, t, cond=None,
@@ -121,15 +128,15 @@ class TensorCloudFlowMatcher(hk.Module):
         dt = 1 / num_steps
       
         def update_one_step(xt: TensorCloud, t: float) -> TensorCloud:
-            s = t + dt
-            x̂t = self.make_prediction(xt, t, cond=cond)      
-            next_xt = ((s - t) / (1 - t)) * x̂t + ((1 - s) / (1 - t)) * xt
-            next_xt = (s < 1.) * next_xt + (s >= 1.) * x̂t
-            # v̂t = self.make_prediction(xt, t, cond=cond) 
-            # next_xt = xt + dt * v̂t
+            # s = t + dt
+            # x̂t = self.make_prediction(xt, t, cond=cond)      
+            # next_xt = ((s - t) / (1 - t)) * x̂t + ((1 - s) / (1 - t)) * xt
+            # next_xt = (s < 1.) * (t < 1.0) * next_xt + (s >= 1.) * (t == 1.0) * x̂t
+            v̂t = self.make_prediction(xt, t, cond=cond) 
+            next_xt = xt + dt * v̂t
             return next_xt, next_xt
 
-        x0 = self.normal.sample(
+        x0 = self.dist.sample(
             hk.next_rng_key(), 
             leading_shape=self.leading_shape
         )
@@ -140,12 +147,13 @@ class TensorCloudFlowMatcher(hk.Module):
         )
 
     def p_t(self, x1, t: int, sigma_min: float = 1e-2):
-        x0 = self.normal.sample(
-            hk.next_rng_key(),
+        x0 = self.dist.sample(
+            hk.next_rng_key(), 
             leading_shape=self.leading_shape,
             mask=x1.mask_irreps_array,
         )
         x0 = x0.centralize()
+        # x0, x1 = align_with_rotation(x0, x1)
         xt = t * x1 + (1 - t) * x0
         vt = (x1 + (-x0))
         return xt, vt
@@ -156,20 +164,20 @@ class TensorCloudFlowMatcher(hk.Module):
         cond: e3nn.IrrepsArray = None,
         is_training = False
     ):
-        t = jax.random.randint(hk.next_rng_key(), (), 0, self.num_timesteps)
-        
         x1 = x1.centralize()
-        xt, v1 = self.p_t(x1, t)
-        x̂1 = self.make_prediction(xt, t, cond=cond)
+        t = jax.random.randint(hk.next_rng_key(), (), 0, self.num_timesteps)
 
-        # xt, vt = self.p_t(x1, t)
-        # v̂t = self.make_prediction(xt, t, cond=cond)
+        # xt, v1 = self.p_t(x1, t)
+        # x̂1 = self.make_prediction(xt, t, cond=cond)
+
+        xt, vt = self.p_t(x1, t)
+        v̂t = self.make_prediction(xt, t, cond=cond)
 
         return ModelPrediction(
-            # prediction=v̂t,
-            # target=vt,
-            prediction=x̂1,
-            target=x1,
+            prediction=v̂t,
+            target=vt,
+            # prediction=x̂1,
+            # target=x1,
             reweight=1
         )
 

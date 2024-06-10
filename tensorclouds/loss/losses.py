@@ -199,10 +199,10 @@ class VectorCloudMatchingLoss(LossFunction):
     ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
         pred, target = model_output.prediction, model_output.target
 
-        vec_irreps = '1o'
+        vec_irreps = '1e'
         pred_vectors = rearrange(pred.irreps_array.filter(vec_irreps).array, '... (v e) -> ... v e', e=3)
         target_vectors = rearrange(target.irreps_array.filter(vec_irreps).array, '... (v e) -> ... v e', e=3)
-        vec_mask = repeat(target.mask_coord, 'r -> r v', v=pred_vectors.shape[-2])
+        vec_mask = (target_vectors.sum(-1) != 0.0)
 
         pred_vectors = pred_vectors + pred.coord[:, None, :]
         target_vectors = target_vectors + target.coord[:, None, :]
@@ -403,6 +403,8 @@ class VectorMapLoss(LossFunction):
     def _call(
         self, rng_key, prediction: ProteinDatum, ground: ProteinDatum
     ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
+
+
         all_atom_coords = rearrange(prediction.atom_coord, "... a c -> (... a) c")
         all_atom_coords_ground = rearrange(ground.atom_coord, "... a c -> (... a) c")
         all_atom_mask = rearrange(ground.atom_mask, "... a -> (... a)")
