@@ -128,12 +128,12 @@ class TensorCloudFlowMatcher(hk.Module):
         dt = 1 / num_steps
       
         def update_one_step(xt: TensorCloud, t: float) -> TensorCloud:
-            # s = t + dt
-            # x̂t = self.make_prediction(xt, t, cond=cond)      
-            # next_xt = ((s - t) / (1 - t)) * x̂t + ((1 - s) / (1 - t)) * xt
-            # next_xt = (s < 1.) * (t < 1.0) * next_xt + (s >= 1.) * (t == 1.0) * x̂t
-            v̂t = self.make_prediction(xt, t, cond=cond) 
-            next_xt = xt + dt * v̂t
+            s = t + dt
+            x̂t = self.make_prediction(xt, t, cond=cond)      
+            next_xt = ((s - t) / (1 - t)) * x̂t + ((1 - s) / (1 - t)) * xt
+            next_xt = (s < 1.) * (t < 1.0) * next_xt + (s >= 1.) * (t == 1.0) * x̂t
+            # v̂t = self.make_prediction(xt, t, cond=cond) 
+            # next_xt = xt + dt * v̂t
             return next_xt, next_xt
 
         x0 = self.dist.sample(
@@ -167,11 +167,11 @@ class TensorCloudFlowMatcher(hk.Module):
         x1 = x1.centralize()
         t = jax.random.randint(hk.next_rng_key(), (), 0, self.num_timesteps)
 
-        # xt, v1 = self.p_t(x1, t)
-        # x̂1 = self.make_prediction(xt, t, cond=cond)
+        xt, v1 = self.p_t(x1, t)
+        x̂1 = self.make_prediction(xt, t, cond=cond)
 
-        xt, vt = self.p_t(x1, t)
-        v̂t = self.make_prediction(xt, t, cond=cond)
+        # xt, vt = self.p_t(x1, t)
+        # v̂t = self.make_prediction(xt, t, cond=cond)
 
         return ModelPrediction(
             prediction=v̂t,
