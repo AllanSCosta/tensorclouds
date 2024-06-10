@@ -131,7 +131,7 @@ class TensorCloudFlowMatcher(hk.Module):
             s = t + dt
             x̂t = self.make_prediction(xt, t, cond=cond)      
             next_xt = ((s - t) / (1 - t)) * x̂t + ((1 - s) / (1 - t)) * xt
-            next_xt = (s < 1.) * (t < 1.0) * next_xt + (s >= 1.) * (t == 1.0) * x̂t
+            next_xt = (t < 1.0) * next_xt + (t >= 1.0) * x̂t
             # v̂t = self.make_prediction(xt, t, cond=cond) 
             # next_xt = xt + dt * v̂t
             return next_xt, next_xt
@@ -174,10 +174,10 @@ class TensorCloudFlowMatcher(hk.Module):
         # v̂t = self.make_prediction(xt, t, cond=cond)
 
         return ModelPrediction(
-            prediction=v̂t,
-            target=vt,
-            # prediction=x̂1,
-            # target=x1,
+            # prediction=v̂t,
+            # target=vt,
+            prediction=x̂1,
+            target=x1,
             reweight=1
         )
 

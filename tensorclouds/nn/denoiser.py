@@ -178,10 +178,8 @@ class Denoiser(hk.Module):
             states.append(x.irreps_array)
 
         x = x.replace(
-            irreps_array=EquivariantLayerNorm()(
-                e3nn.haiku.Linear(self.layers[-2])(
-                    e3nn.concatenate(states, axis=-1).regroup()
-                )
+            irreps_array=e3nn.haiku.Linear(self.layers[-2])(
+                e3nn.concatenate(states, axis=-1).regroup()
             )
         )
         return x
