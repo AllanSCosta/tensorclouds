@@ -122,11 +122,11 @@ class StepInterpolantLoss(LossFunction):
     def _call(self, _, model_output: ModelOutput, __: ProteinDatum):    
         noise_prediction, drift_prediction = model_output 
 
-        pred_d = drift_prediction.drift_prediction
-        d = drift_prediction.drift
+        pred_d = drift_prediction.prediction
+        d = drift_prediction.target
 
-        pred_z = noise_prediction.noise_prediction
-        z = noise_prediction.noise
+        pred_z = noise_prediction.prediction
+        z = noise_prediction.target
 
         def stochastic_interpolant_loss(pred, target):
             feature_dot1, coord_dot1 = pred.dot(pred)

@@ -82,7 +82,7 @@ class Platform:
 
         def _train_wrapper(trainer, env, zen_cfg) -> None:
             trainer_ = trainer(run=self.run, save_model=self.save_model)
-            trainer_.train(params)
+            trainer_.train()
 
         train = zen(_train_wrapper, pre_call=_setup)
         train.validate(self.cfg)

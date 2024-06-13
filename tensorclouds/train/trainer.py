@@ -23,9 +23,14 @@ class TrainState(NamedTuple):
     opt_state: Any
 
 
-def batch_dict(list_):
-    keys = list_[0].keys()
-    return {k: np.stack([d[k] for d in list_]) for k in keys if list_[0][k] is not None}
+import jax.numpy as jnp
+
+def tree_stack(trees):
+    return jax.tree_util.tree_map(lambda *v: jnp.stack(v), *trees)
+
+def tree_unstack(tree):
+    leaves, treedef = jax.tree_util.tree_flatten(tree)
+    return [treedef.unflatten(leaf) for leaf in zip(*leaves, strict=True)]
 
 
 class Trainer:
@@ -43,8 +48,8 @@ class Trainer:
         save_every,
         validate_every,
 
-        save_model: Callable,
-        run: Run,
+        save_model: Callable=None,
+        run: Run = None,
 
         single_datum: bool = False,
         single_batch: bool = False,
@@ -80,13 +85,15 @@ class Trainer:
         print(f"Batch Size: {self.batch_size}")
         self.save_model = save_model
         self.run = run
+
+        self.name = self.run.name if run else 'trainer'
         self.max_grad = 1000.0
         self.loaders = {
             split: DataLoader(
                 self.dataset.splits[split],
                 batch_size=self.batch_size,
                 num_workers=self.num_workers,
-                collate_fn=lambda x: batch_dict([batch_dict([x__.to_dict() for x__ in x_]) for x_ in x]),
+                collate_fn=lambda x: x,
             ) for split in self.dataset.splits
         }
 
@@ -103,7 +110,7 @@ class Trainer:
             print('[!!WARNING!!] using single datum')
             sample_batch = next(iter(self.loaders['train']))
             sample_datum = sample_batch[0]
-            sample_batch = [sample_datum] * len(sample_batch)
+            sample_batch = [sample_datum] * self.batch_size
             self.loaders = { 'train': [sample_batch] * 1000 }
 
         self.plot_pipe = plot_pipe
@@ -130,34 +137,38 @@ class Trainer:
             self.sample_conditional = True
             self.plot_mode = 'trajectory'
 
+        self.metrics = defaultdict(list)
+
+        self.init()
+
     def init(self):
         print("Initializing Model...")
-        # init_datum = next(iter(self.loaders['train']))
-        init_datum = batch_dict([x_.to_dict() for x_ in self.dataset.splits['train'][0]])
+        init_datum = self.dataset.splits['train'][0]
+        init_datum = [init_datum.to_pytree()] if type(init_datum) != list else [d.to_pytree() for d in init_datum] 
 
         rng_seq = hk.PRNGSequence(self.seed)
         init_rng = next(rng_seq)
 
-        def _init(rng, datum):
-            params = self.transform.init(rng, datum)
+        def _init(rng, *datum):
+            params = self.transform.init(rng, *datum)
             opt_state = self.optimizer.init(params)
             return TrainState(
                 params,
                 opt_state,
             )
     
-        train_state = jax.jit(_init)(init_rng, init_datum)
-        num_params = hk.data_structures.tree_size(train_state.params)
+        self.rng_seq = hk.PRNGSequence(self.seed)
+        self.train_state = jax.jit(_init)(init_rng, *init_datum)
 
+        num_params = hk.data_structures.tree_size(self.train_state.params)
         print(f"Model has {num_params:.3e} parameters")
-        self.run.summary["NUM_PARAMS"] = num_params
+        if self.run: self.run.summary["NUM_PARAMS"] = num_params
 
-        return rng_seq, train_state
 
     @functools.partial(jax.jit, static_argnums=(0,))
     def loss(self, params, keys, batch, step):
         def _apply_losses(params, rng_key, datum: Any, step: int):
-            model_output = self.transform.apply(params, rng_key, datum, True)
+            model_output = self.transform.apply(params, rng_key, *datum, True)
             return self.losses(rng_key, model_output, datum, step)
         
         output, loss, metrics = jax.vmap(_apply_losses, in_axes=(None, 0, 0, None))(params, keys, batch, step)
@@ -206,7 +217,6 @@ class Trainer:
         samples = inner_split(samples)
     
         sample_metrics = {}
-
         if step != 0: 
             sample_metrics.update({'sample_time': end - start})
 
@@ -229,11 +239,9 @@ class Trainer:
 
     def epoch(
         self,
-        train_state,
-        rng_seq,
-        epoch,
+        epoch
     ) -> Tuple[Dict, Dict]:
-
+        
         for split in self.loaders.keys():
             if (self.train_only and split != 'train') or (split != 'train' and epoch % self.validate_every != 0):
                 continue
@@ -241,79 +249,77 @@ class Trainer:
             loader = self.loaders[split]
 
             pbar = tqdm(loader, position=1, disable=False)
-            pbar.set_description(f"[{self.run.name}] {split}@{epoch}")
+            pbar.set_description(f"[{self.name}] {split}@{epoch}")
             
             # batch_size = None
             epoch_metrics = defaultdict(list)
 
-            for step, batch in enumerate(pbar):
-                if batch['residue_token'].shape[0] != self.batch_size:
-                    continue
+            for step, data in enumerate(pbar):
+
+                if len(data) != self.batch_size:
+                    continue                
+                batch = tree_stack([[d.to_pytree()] if type(d)!= list else [d_.to_pytree() for d_ in d] for d in data])
 
                 total_step = epoch * len(loader) + step
-                keys = jax.random.split(next(rng_seq), batch['residue_token'].shape[0])
+                keys = jax.random.split(next(self.rng_seq), len(data))
 
                 batched = batch
-                output, new_train_state, metrics = self.update(
-                    keys, train_state, batched, total_step
+                output, new_train_state, step_metrics = self.update(
+                    keys, self.train_state, batched, total_step
                 )
                 output = inner_split(output)
-                pbar.set_postfix({"loss": f"{metrics['loss']:.3e}"})
+                pbar.set_postfix({"loss": f"{step_metrics['loss']:.3e}"})
 
                 _param_has_nan = lambda agg, p: jnp.isnan(p).any() | agg
                 has_nan = tree_reduce(_param_has_nan, new_train_state.params, initializer=False)
-                # has_nan = jax.tree_util.tree_map(lambda x: jnp.isnan(x).any(), new_train_state.params)
-                # for k, v in has_nan.items(): print(k, v.item())
-                # if has_nan:
-                    # breakpo'int()
-                metrics.update(dict(has_nan=has_nan))
+
+                step_metrics.update(dict(has_nan=has_nan))
 
                 if not has_nan and split == 'train':
-                    train_state = new_train_state
+                    self.train_state = new_train_state
 
                 if (self.plot_pipe is not None) and split == 'train' and total_step % self.plot_every == 0:
                     self.plot_pipe(self.run, output, batch)
                 
                 if (self.sample_every is not None) and split == 'train' and total_step % self.sample_every == 0:
-                    sample_metrics = self.run_sample(rng_seq, train_state, batch, total_step)
-                    metrics.update(
+                    sample_metrics = self.run_sample(self.rng_seq, self.train_state, batch, total_step)
+                    step_metrics.update(
                         {f'{k}': v for k, v in sample_metrics.items()}
                     )
 
                 if split == 'train':
+                    for (k, v) in step_metrics.items():
+                        self.metrics[f'{split}/{k}'].append(float(v))
+                    if self.run:
+                        self.run.log(
+                            {
+                                **{f'{split}/{k}': float(v) 
+                                for (k, v) in step_metrics.items()},
+                                'step':total_step,
+                            }
+                        )    
+
+
+                    if self.save_model and total_step % self.save_every == 0:
+                        self.save_model(self.train_state.params)
+
+                for (k, v) in step_metrics.items():
+                    epoch_metrics[k].append(v)                
+            
+            for (k, v) in epoch_metrics.items():
+                self.metrics[f'{split}/{k}_epoch'].append(float(np.mean(v)))
+                if self.run:
                     self.run.log(
                         {
-                            **{f'{split}/{k}': float(v) 
-                               for (k, v) in metrics.items()},
-                            'step':total_step,
-                        }
-                    )    
-                    if total_step % self.save_every == 0:
-                        self.save_model(train_state.params)
-
-                for k, v in metrics.items():
-                    epoch_metrics[k].append(v)                
-
-            self.run.log(
-                {
-                    **{ 
-                        f'{split}/{k}_epoch': float(np.mean(v)) 
-                        for (k, v) in epoch_metrics.items()
-                    },
-                    'epoch': epoch
-                },
-            )
-            
-        return train_state
-
-    def train(self, params=None) -> Run:
-        rng_seq, train_state = self.init()
-        if params is not None:
-            train_state = TrainState(params, train_state.opt_state)
-        print("Starting Training Loop...")
+                            **{ 
+                                f'{split}/{k}_epoch': float(np.mean(v)) 
+                                for (k, v) in epoch_metrics.items()
+                            },
+                            'epoch': epoch
+                        },
+                    )
+                
+    def train(self) -> Run:
+        print("Training...")
         for epoch in tqdm(range(self.num_epochs), position=0):
-            train_state = self.epoch(
-                train_state=train_state,
-                rng_seq=rng_seq,
-                epoch=epoch,
-            )
+            self.epoch(epoch=epoch)
