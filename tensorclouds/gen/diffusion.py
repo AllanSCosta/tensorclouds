@@ -6,7 +6,7 @@ import haiku as hk
 import e3nn_jax as e3nn
 from tensorclouds.random.normal import NormalDistribution
 from ..tensorcloud import TensorCloud
-
+from ..utils import align_with_rotation
 from typing import List
 
 
@@ -176,6 +176,10 @@ class TensorCloudDiffuser(hk.Module):
             leading_shape=self.leading_shape,
             mask=x0.mask_irreps_array,
         )
+        z = z.centralize()
+
+        z, x0 = align_with_rotation(z, x0)
+        
         return (
             self.sqrt_alphas_cumprod[t] * x0
             + self.sqrt_one_minus_alphas_cumprod[t] * z

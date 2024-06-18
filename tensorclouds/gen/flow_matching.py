@@ -13,6 +13,7 @@ from typing import List
 
 import chex
 
+
 @chex.dataclass
 class ModelPrediction:
     prediction: TensorCloud
@@ -21,8 +22,6 @@ class ModelPrediction:
 
 
 from typing import Tuple
-
-
 
 
 def compute_rotation_for_alignment(x: TensorCloud, y: TensorCloud):
@@ -59,9 +58,7 @@ def align_with_rotation(
     x1: TensorCloud,
 ) -> Tuple[TensorCloud, TensorCloud]:
     """Aligns x0 to x1 via a rotation."""
-    R = compute_rotation_for_alignment(
-        x0, x1
-    )
+    R = compute_rotation_for_alignment(x0, x1)
     coord = e3nn.IrrepsArray("1o", x0.coord)
     rotated_coord = coord.transform_by_matrix(R).array
     x0 = x0.replace(
@@ -69,7 +66,6 @@ def align_with_rotation(
         irreps_array=x0.irreps_array.transform_by_matrix(R),
     )
     return x0, x1
-
 
 
 class TensorCloudFlowMatcher(hk.Module):
@@ -94,7 +90,7 @@ class TensorCloudFlowMatcher(hk.Module):
         self.var_features = var_features
         self.var_coords = var_coords
 
-        self.irreps = irreps        
+        self.irreps = irreps
         self.dist = NormalDistribution(
             irreps_in=self.irreps,
             irreps_mean=e3nn.zeros(self.irreps),
@@ -106,12 +102,15 @@ class TensorCloudFlowMatcher(hk.Module):
         # self.dist = HarmonicDistribution(
         #     irreps=self.irreps,
         #     var_features=self.var_features,
-        #     N = leading_shape[-1],
+        #     N=leading_shape[-1],
         # )
-
+        self.atom_mask = None
 
     def make_prediction(
-        self, x, t, cond=None,
+        self,
+        x,
+        t,
+        cond=None,
     ):
         pred_feature = self.feature_net(x, t, cond=cond)
         pred_coord = self.coord_net(x, t, cond=cond)
@@ -119,65 +118,91 @@ class TensorCloudFlowMatcher(hk.Module):
             irreps_array=pred_feature.irreps_array,
             coord=pred_coord.coord,
         )
-    
+
     def sample(
-        self, 
+        self,
         cond: e3nn.IrrepsArray = None,
         num_steps: int = 1000,
+        atom_mask=None,
+        x1=None,
     ):
         dt = 1 / num_steps
-      
-        def update_one_step(xt: TensorCloud, t: float) -> TensorCloud:
-            s = t + dt
-            x̂t = self.make_prediction(xt, t, cond=cond)      
-            next_xt = ((s - t) / (1 - t)) * x̂t + ((1 - s) / (1 - t)) * xt
-            next_xt = (t < 1.0) * next_xt + (t >= 1.0) * x̂t
-            # v̂t = self.make_prediction(xt, t, cond=cond) 
-            # next_xt = xt + dt * v̂t
-            return next_xt, next_xt
 
-        x0 = self.dist.sample(
-            hk.next_rng_key(), 
-            leading_shape=self.leading_shape
-        )
+        def update_one_step(zt: TensorCloud, t: float) -> TensorCloud:
+            # s = t + dt
+            # x̂t = self.make_prediction(xt, t, cond=cond)
+            # next_xt = ((s - t) / (1 - t)) * x̂t + ((1 - s) / (1 - t)) * xt
+            # next_xt = (t < 1.0) * next_xt + (t >= 1.0) * x̂t
+            # if atom_mask is not None:
+            #     xt = xt.replace(irreps_array=atom_mask * xt.irreps_array)
+            v̂t = self.make_prediction(zt, t, cond=cond)
+            # v̂t = v̂t.replace(irreps_array=atom_mask * v̂t.irreps_array)
+            next_zt = zt + dt * v̂t
+            next_zt = next_zt.centralize()
+
+            next_zt = next_zt.replace(
+                irreps_array=e3nn.IrrepsArray(
+                    next_zt.irreps_array.irreps,
+                    next_zt.irreps_array.array * (zt.irreps_array.array != 0.0),
+                )
+            )
+
+            return next_zt, next_zt
+
+        x0 = self.dist.sample(hk.next_rng_key(), leading_shape=self.leading_shape)
+        x0 = x0.centralize()
+        # if x1 is not None:
+        #     x0 = x0.replace(irreps_array=atom_mask * x0.irreps_array + x1.irreps_array.filter("1e"))
+
         return hk.scan(
             update_one_step,
             x0,
-            jnp.arange(0, 1, dt),
+            jnp.linspace(0, 1, num_steps),
         )
 
     def p_t(self, x1, t: int, sigma_min: float = 1e-2):
         x0 = self.dist.sample(
-            hk.next_rng_key(), 
+            hk.next_rng_key(),
+            leading_shape=self.leading_shape,
+            mask=x1.mask_irreps_array,
+        )
+        z = self.dist.sample(
+            hk.next_rng_key(),
             leading_shape=self.leading_shape,
             mask=x1.mask_irreps_array,
         )
         x0 = x0.centralize()
-        # x0, x1 = align_with_rotation(x0, x1)
-        xt = t * x1 + (1 - t) * x0
-        vt = (x1 + (-x0))
+        x0, x1 = align_with_rotation(x0, x1)
+
+        gamma = lambda t: jnp.sqrt(t * (1 - t))
+        gamma_dot = lambda t: (1 / (2 * jnp.sqrt(t * (1 - t) + 1e-2))) * (
+                1 - 2 * t
+            )
+ 
+        xt = (
+            t * x1
+            + (1 - t) * x0
+            + gamma(t) * z
+        )
+        vt = x1 + (-x0) + gamma_dot(t) * z
         return xt, vt
-    
+
     def __call__(
-        self, 
-        x1: TensorCloud, 
-        cond: e3nn.IrrepsArray = None,
-        is_training = False
+        self, x1: TensorCloud, cond: e3nn.IrrepsArray = None, is_training=False
     ):
         x1 = x1.centralize()
-        t = jax.random.randint(hk.next_rng_key(), (), 0, self.num_timesteps)
+        t = jax.random.uniform(hk.next_rng_key())
 
-        xt, v1 = self.p_t(x1, t)
-        x̂1 = self.make_prediction(xt, t, cond=cond)
+        # xt, v1 = self.p_t(x1, t)
+        # x̂1 = self.make_prediction(xt, t, cond=cond)
 
-        # xt, vt = self.p_t(x1, t)
-        # v̂t = self.make_prediction(xt, t, cond=cond)
+        xt, vt = self.p_t(x1, t)
+        v̂t = self.make_prediction(xt, t, cond=cond)
 
         return ModelPrediction(
-            # prediction=v̂t,
-            # target=vt,
-            prediction=x̂1,
-            target=x1,
-            reweight=1
+            prediction=v̂t,
+            target=vt,
+            # prediction=x̂1,
+            # target=x1,
+            reweight=1,
         )
-

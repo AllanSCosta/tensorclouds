@@ -1,4 +1,3 @@
-
 import chex
 import e3nn_jax as e3nn
 import jax
@@ -8,8 +7,7 @@ from typing import Optional, Tuple
 from ..tensorcloud import TensorCloud
 
 
-
-class NormalDistribution():
+class NormalDistribution:
     """A normal distribution for TensorClouds."""
 
     def __init__(
@@ -32,24 +30,37 @@ class NormalDistribution():
         self.coords_scale = coords_scale
 
     def sample(
-        self, key: chex.PRNGKey, leading_shape: Tuple[int, ...] = (), mask: jnp.ndarray = None
-    ) -> TensorCloud:  # TODO(Ilan): add option for custom mask..
+        self,
+        key: chex.PRNGKey,
+        leading_shape: Tuple[int, ...] = (),
+        mask: jnp.ndarray = None,
+        irreps_mean: Optional[e3nn.IrrepsArray] = None,
+    ) -> TensorCloud:
         """Sample from the distribution."""
         irreps_key, coords_key = jax.random.split(key)
+        
         irreps = (
             e3nn.normal(self.irreps_in, leading_shape=leading_shape, key=irreps_key)
             * self.irreps_scale
         )
+        if irreps_mean is not None:
+            self.irreps_mean = irreps_mean    
+        irreps = irreps + self.irreps_mean
+        
         coords = jax.random.normal(coords_key, (*leading_shape, 3)) * self.coords_scale
+        coords = coords + self.coords_mean
+
         if mask is not None:
             irreps = irreps * mask[..., None]
             coords = coords * mask[..., None]
-            
+        else:
+            mask = jnp.ones(leading_shape, dtype=bool)
+
         return TensorCloud(
             irreps_array=irreps,
-            mask_irreps_array=jnp.ones(leading_shape, dtype=bool),
+            mask_irreps_array=mask,
             coord=coords,
-            mask_coord=jnp.ones(leading_shape, dtype=bool),
+            mask_coord=mask,
         )
 
     def log_likelihood(self, x: TensorCloud) -> chex.Array:
