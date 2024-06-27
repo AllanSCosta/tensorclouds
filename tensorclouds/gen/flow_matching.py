@@ -182,9 +182,8 @@ class TensorCloudFlowMatcher(hk.Module):
         xt = (
             t * x1
             + (1 - t) * x0
-            + gamma(t) * z
         )
-        vt = x1 + (-x0) + gamma_dot(t) * z
+        vt = x1 + (-x0) 
         return xt, vt
 
     def __call__(
