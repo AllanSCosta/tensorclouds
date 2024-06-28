@@ -106,7 +106,7 @@ class Denoiser(hk.Module):
 
         # first mix
         x = SelfInteraction(
-            [self.layers[0]],
+            [self.layers[0]] * 2,
             full_square=True,
             norm_last=False,
         )(x)
@@ -155,7 +155,8 @@ class Denoiser(hk.Module):
                     radial_cut=self.radial_cut,
                     radial_bins=32,
                     radial_basis='gaussian',
-                    move=self.move,
+                    # move=self.move,
+                    move=False,
                 )(x)
             else:
                 x = CompleteSpatialConvolution(
@@ -163,7 +164,8 @@ class Denoiser(hk.Module):
                     radial_cut=self.radial_cut,
                     radial_bins=32,
                     k_seq=self.k_seq,
-                    move=self.move,
+                    # move=self.move,
+                    move=False,
                 )(x)
 
             x = x.replace(
