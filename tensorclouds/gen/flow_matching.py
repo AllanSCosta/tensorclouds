@@ -1,7 +1,7 @@
 import functools
 import jax
 import jax.numpy as jnp
-import haiku as hk
+from flax import linen as nn
 
 import e3nn_jax as e3nn
 from tensorclouds.random.normal import NormalDistribution
@@ -17,8 +17,7 @@ import chex
 class ModelPrediction:
     prediction: TensorCloud
     target: TensorCloud
-    reweight: float
-
+    reweight: float = 1.0
 
 from typing import Tuple
 
@@ -72,29 +71,17 @@ def align_with_rotation(
 
 
 
-class TensorCloudFlowMatcher(hk.Module):
+class TensorCloudFlowMatcher(nn.Module):
 
-    def __init__(
-        self,
-        feature_net: hk.Module,
-        coord_net: hk.Module,
-        irreps: e3nn.Irreps,
-        var_features: float,
-        var_coords: float,
-        timesteps=1000,
-        leading_shape=(1,),
-    ):
-        super().__init__()
-        self.feature_net = feature_net(time_range=(0.0, 1.0))
-        self.coord_net = coord_net(time_range=(0.0, 1.0))
+    feature_net: nn.Module
+    coord_net: nn.Module
+    irreps: e3nn.Irreps
+    var_features: float
+    var_coords: float
+    timesteps=1000
+    leading_shape=(1,)
 
-        self.num_timesteps = timesteps
-        self.leading_shape = leading_shape
-
-        self.var_features = var_features
-        self.var_coords = var_coords
-
-        self.irreps = irreps        
+    def setup(self):
         self.dist = NormalDistribution(
             irreps_in=self.irreps,
             irreps_mean=e3nn.zeros(self.irreps),
@@ -102,7 +89,6 @@ class TensorCloudFlowMatcher(hk.Module):
             coords_mean=jnp.zeros(3),
             coords_scale=self.var_coords,
         )
-
         # self.dist = HarmonicDistribution(
         #     irreps=self.irreps,
         #     var_features=self.var_features,
@@ -111,19 +97,21 @@ class TensorCloudFlowMatcher(hk.Module):
 
 
     def make_prediction(
-        self, x, t, cond=None,
+        self, x, t, cond=None
     ):
         pred_feature = self.feature_net(x, t, cond=cond)
         pred_coord = self.coord_net(x, t, cond=cond)
         return x.replace(
-            irreps_array=pred_feature.irreps_array,
-            coord=pred_coord.coord,
+            irreps_array=x.mask_irreps_array * pred_feature.irreps_array,
+            coord=x.mask_coord * pred_coord.coord,
         )
     
     def sample(
         self, 
         cond: e3nn.IrrepsArray = None,
         num_steps: int = 1000,
+        mask_features: jnp.array = None,
+        mask_coord: jnp.array = None,
     ):
         dt = 1 / num_steps
       
@@ -137,26 +125,33 @@ class TensorCloudFlowMatcher(hk.Module):
             return next_xt, next_xt
 
         x0 = self.dist.sample(
-            hk.next_rng_key(), 
-            leading_shape=self.leading_shape
+            self.make_rng(), 
+            leading_shape=self.leading_shape,
+            mask_features=mask_features,
+            mask_coord=mask_coord,
         )
-        return hk.scan(
+        
+        ts = jnp.arange(0, 1, dt)
+        
+        return nn.scan(
             update_one_step,
-            x0,
-            jnp.arange(0, 1, dt),
-        )
+            variable_broadcast="params",
+            split_rngs={"params": True},
+        )(self.network, x0, ts)
+
 
     def p_t(self, x1, t: int, sigma_min: float = 1e-2):
         x0 = self.dist.sample(
-            hk.next_rng_key(), 
+            self.make_rng(), 
             leading_shape=self.leading_shape,
-            mask=x1.mask_irreps_array,
+            mask_coord=x1.mask_coord,
+            mask_features=x1.mask_irreps_array,
         )
         x0 = x0.centralize()
-        # x0, x1 = align_with_rotation(x0, x1)
+        x0, x1 = align_with_rotation(x0, x1)
         xt = t * x1 + (1 - t) * x0
         vt = (x1 + (-x0))
-        return xt, vt
+        return xt, vt, x0
     
     def __call__(
         self, 
@@ -165,9 +160,9 @@ class TensorCloudFlowMatcher(hk.Module):
         is_training = False
     ):
         x1 = x1.centralize()
-        t = jax.random.randint(hk.next_rng_key(), (), 0, self.num_timesteps)
+        t = jax.random.randint(self.make_rng(), (), 0, self.num_timesteps)
 
-        xt, v1 = self.p_t(x1, t)
+        xt, v1, x0 = self.p_t(x1, t)
         x̂1 = self.make_prediction(xt, t, cond=cond)
 
         # xt, vt = self.p_t(x1, t)
@@ -178,6 +173,6 @@ class TensorCloudFlowMatcher(hk.Module):
             # target=vt,
             prediction=x̂1,
             target=x1,
-            reweight=1
+            reweight=1,
         )
 

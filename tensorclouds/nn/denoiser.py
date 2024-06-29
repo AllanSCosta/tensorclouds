@@ -1,11 +1,13 @@
 import functools
 import math
-import haiku as hk
+from flax import linen as nn
 import jax.numpy as jnp
 import e3nn_jax as e3nn
-from typing import List
+from typing import List, Tuple
 
-from .spatial_convolution import IPA, CompleteSpatialConvolution, kNNSpatialConvolution
+from tensorclouds.nn.utils import safe_normalize
+
+from .spatial_convolution import CompleteSpatialConvolution, kNNSpatialConvolution
 from .self_interaction import SelfInteraction
 from ..tensorcloud import TensorCloud 
 
@@ -16,18 +18,18 @@ import jax
 from .sequence_convolution import SequenceConvolution
 
 
-class ApproximateTimeEmbed(hk.Module):
-    def __init__(self, timesteps: int):
-        super().__init__()
-        self.timesteps = timesteps
+class ApproximateTimeEmbed(nn.Module):
 
+    timesteps: int
+
+    @nn.compact
     def __call__(self, state: TensorCloud, t: float) -> TensorCloud:
         irreps_array = state.irreps_array
         mask = state.mask_irreps_array
 
         num_scalars = irreps_array.filter("0e").array.shape[-1]
         t = jnp.floor(t * self.timesteps).astype(jnp.int32)
-        t_emb = hk.Embed(self.timesteps, num_scalars)(t)
+        t_emb = nn.Embed(self.timesteps, num_scalars)(t)
 
         t_emb = t_emb * mask[..., None]
         irreps_array = e3nn.concatenate(
@@ -37,12 +39,12 @@ class ApproximateTimeEmbed(hk.Module):
         return state.replace(irreps_array=irreps_array)
 
 
-class OnehotTimeEmbed(hk.Module):
-    def __init__(self, timesteps: int, time_range=(0.0, 1.0)):
-        super().__init__()
-        self.timesteps = timesteps
-        self.time_range = time_range
+class OnehotTimeEmbed(nn.Module):
 
+    timesteps: int = 1000
+    time_range: Tuple[int] = (0.0, 1.0)
+
+    @nn.compact
     def __call__(self, state: TensorCloud, t: float) -> TensorCloud:
         irreps_array = state.irreps_array
         mask = state.mask
@@ -65,44 +67,23 @@ class OnehotTimeEmbed(hk.Module):
 
 import einops as ein
 
-class Denoiser(hk.Module):
 
-    def __init__(
-        self,
-        layers: List[e3nn.Irreps],
-        k: int = 0,
-        k_seq: int = 0,
-        radial_cut = 32.0,
-        timesteps = 100,
-        time_range = (0.0, 1.0),
-        full_square=False,
-        conservative=False,
-        move=False,
-    ):
-        super().__init__()
-        self.layers = layers
-        self.radial_cut = radial_cut
-        self.time_embed = OnehotTimeEmbed(timesteps, time_range=time_range)
-        self.full_square=full_square
-        self.conservative = conservative
-        self.k = k
-        self.k_seq = k_seq
-        self.move = False
+class Denoiser(nn.Module):
 
-    def mix(self, x, t, cond):
+    layers: Tuple[e3nn.Irreps]
+    k: int = 0
+    k_seq: int = 0
+    radial_cut: float = 32.0
+    timesteps: int = 100
+    time_range: Tuple = (0.0, 1.0)
+    full_square: bool = False
+    conservative: bool = False
+    move: bool = False
 
+    @nn.compact
+    def __call__(self, x, t=None, cond=None):
         if cond is not None:
-            x = x.replace(irreps_array=e3nn.concatenate([x.irreps_array, cond], axis=-1).regroup())                
-        
-        # frame = jnp.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
-        # frame = ein.repeat(frame, 'e c -> n (e c)', n=x.irreps_array.shape[0])
-        # reference_frame = e3nn.IrrepsArray(
-        #     "3x1e", frame)
-        # x = x.replace(
-        #     irreps_array=e3nn.concatenate(
-        #         (x.irreps_array, reference_frame), axis=-1
-        #     ).regroup()
-        # )
+            x = x.replace(irreps_array=e3nn.concatenate([x.irreps_array, cond], axis=-1).regroup())
 
         # first mix
         x = SelfInteraction(
@@ -111,9 +92,9 @@ class Denoiser(hk.Module):
             norm_last=False,
         )(x)
 
-        pos = hk.Embed(
-            vocab_size=x.irreps_array.shape[0], 
-            embed_dim=x.irreps_array.filter('0e').shape[-1]
+        pos = nn.Embed(
+            num_embeddings=x.irreps_array.shape[0], 
+            features=x.irreps_array.filter('0e').shape[-1]
         )(jnp.arange(x.irreps_array.shape[0]))
 
         pos = e3nn.IrrepsArray(
@@ -123,10 +104,11 @@ class Denoiser(hk.Module):
         x = x.replace(
             irreps_array=e3nn.concatenate((
                 x.irreps_array, pos
-            ), axis=-1).regroup() * x.mask_irreps_array[..., None]
+            ), axis=-1).regroup() * x.mask_coord[..., None]
         )
 
-        x = self.time_embed(x, t)
+        if t is not None:
+            x = OnehotTimeEmbed(self.timesteps, self.time_range)(x, t)
 
         # second mix
         x = SelfInteraction(
@@ -137,7 +119,7 @@ class Denoiser(hk.Module):
 
         states = [ x.irreps_array ]
 
-        for irreps in self.layers:
+        for irreps in self.layers[:-1]:
             res = x # residual connection
 
             x = SelfInteraction(
@@ -169,7 +151,7 @@ class Denoiser(hk.Module):
             x = x.replace(
                 irreps_array = e3nn.concatenate(
                     (res.irreps_array, x.irreps_array), axis=-1
-                ).regroup() * x.mask_irreps_array[..., None]
+                ).regroup() * x.mask[..., None]
             )
 
             x = x.replace(
@@ -178,20 +160,25 @@ class Denoiser(hk.Module):
             states.append(x.irreps_array)
 
         x = x.replace(
-            irreps_array=e3nn.haiku.Linear(self.layers[-2])(
+            irreps_array=e3nn.flax.Linear(self.layers[-2])(
                 e3nn.concatenate(states, axis=-1).regroup()
             )
         )
-        return x
-
-    def predict_noise(self, x, t, cond):
-        x = self.mix(x, t, cond=cond)
+        
+        x = SelfInteraction(
+            [self.layers[-2]],
+            norm=True,
+            norm_last=True,
+            full_square=False,
+        )(x)
+        
         tc_out = SelfInteraction(
             [self.layers[-1]],
             norm=False,
             norm_last=False,
             full_square=True,
         )(x)
+
         if not self.move:
             coord_out = SelfInteraction(
                 ['1x0e + 1x1e'],
@@ -203,27 +190,62 @@ class Denoiser(hk.Module):
 
         return tc_out
 
-    def predict_energy(self, x, t, cond=None):
-        x = self.mix(x, t, cond=cond)
-        energy_out = SelfInteraction(
-            [x.irreps_array.irreps, '1x0e'],
-            full_square=False,
-            norm_last=False,
-        )(x).irreps_array.array[..., 0].sum(-1)
-        return energy_out
 
-    def predict_force(self, x, cond, t):
-        gradients = jax.grad(functools.partial(self.predict_energy, t=t, cond=cond), allow_int=True)(x)
-        gradients = TensorCloud(
-            irreps_array=gradients.irreps_array,
-            mask_irreps_array=x.mask_irreps_array,
-            coord=gradients.coord,
-            mask_coord=x.mask_coord,
+
+class TwoTrackDenoiser(nn.Module):
+
+    feature_net: nn.Module
+    coord_net: nn.Module
+
+    @nn.compact
+    def __call__(
+        self, x, t, cond=None,
+    ):
+        pred_feature = self.feature_net(x, t, cond=cond).irreps_array
+        pred_coord = self.coord_net(x, t, cond=cond).coord
+
+        feature_mask = e3nn.IrrepsArray(
+            f'{x.irreps_array.irreps.num_irreps}x0e', x.mask_irreps_array
         )
-        return gradients
+        coord_mask = x.mask_coord[..., None]
+        return x.replace(
+            irreps_array=feature_mask * pred_feature,
+            coord=coord_mask * pred_coord,
+        )
 
-    def __call__(self, x, t, cond=None):
-        if self.conservative:
-            return self.predict_force(x, t=t, cond=cond)
-        else:
-            return self.predict_noise(x, t=t, cond=cond)
+
+
+class FourTrackDenoiser(nn.Module):
+
+    feature_net1: nn.Module
+    feature_net2: nn.Module
+
+    coord_net1: nn.Module
+    coord_net2: nn.Module
+
+    @nn.compact
+    def __call__(
+        self, x, t, cond=None,
+    ):
+        pred_feature1 = self.feature_net1(x, t, cond=cond).irreps_array
+        pred_feature2 = self.feature_net2(x, t, cond=cond).irreps_array
+
+        pred_coord1 = self.coord_net1(x, t, cond=cond).coord
+        pred_coord2 = self.coord_net2(x, t, cond=cond).coord
+
+        feature_mask = e3nn.IrrepsArray(
+            f'{x.irreps_array.irreps.num_irreps}x0e', x.mask_irreps_array
+        )
+        coord_mask = x.mask_coord[..., None]
+
+        x1 = x.replace(
+            irreps_array=feature_mask * pred_feature1,
+            coord=coord_mask * pred_coord1,
+        )
+
+        x2 = x.replace(
+            irreps_array=feature_mask * pred_feature2,
+            coord=coord_mask * pred_coord2,
+        )
+
+        return x1, x2

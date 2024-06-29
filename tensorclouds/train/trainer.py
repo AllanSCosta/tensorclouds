@@ -1,5 +1,7 @@
 from collections import defaultdict
+import os
 import pickle
+import shutil
 import time
 import haiku as hk
 from typing import Callable, NamedTuple, Tuple, Dict, Any
@@ -14,9 +16,28 @@ from .utils import inner_stack, clip_grads, inner_split
 
 from wandb.sdk.wandb_run import Run
 from torch.utils.data import DataLoader
-from tqdm import tqdm
-import jax.numpy as jnp
+import torch
 
+def in_notebook():
+    try:
+        from IPython import get_ipython
+        if 'IPKernelApp' not in get_ipython().config:  # pragma: no cover
+            return False
+    except ImportError:
+        return False
+    except AttributeError:
+        return False
+    return True
+
+if in_notebook():
+    from tqdm.notebook import tqdm
+else:
+    from tqdm import tqdm
+
+
+import jax.numpy as jnp
+from flax.training import orbax_utils
+import orbax
 
 class TrainState(NamedTuple):
     params: Any
@@ -71,7 +92,8 @@ class Trainer:
 
     ):
         self.model = model
-        self.transform = hk.transform(lambda *args: model()(*args))
+        # torch.multiprocessing.set_start_method('spawn')
+        self.transform = model
 
         self.optimizer = optax.adam(learning_rate, 0.9, 0.999)
 
@@ -122,22 +144,8 @@ class Trainer:
         self.load_weights = load_weights
 
         self.sample_every = sample_every
-         
-        if sample_every:
-            sample_model_transform = hk.transform(lambda *args: sample_model().sample(*args))
-            @jax.jit
-            def _sample_model(params, key, *args):
-                return sample_model_transform.apply(params, key, *args)
-            if sample_params:
-                with open(sample_params, 'rb') as f:
-                    self.sample_params = pickle.load(f)
-            self.sample_model = _sample_model
-            self.sample_plot = sample_plot
-            self.sample_metrics = sample_metrics
-            self.sample_conditional = True
-            self.plot_mode = 'trajectory'
-
         self.metrics = defaultdict(list)
+        self.checkpointer = orbax.checkpoint.PyTreeCheckpointer()
 
         self.init()
 
@@ -146,32 +154,41 @@ class Trainer:
         init_datum = self.dataset.splits['train'][0]
         init_datum = [init_datum.to_pytree()] if type(init_datum) != list else [d.to_pytree() for d in init_datum] 
 
-        rng_seq = hk.PRNGSequence(self.seed)
-        init_rng = next(rng_seq)
+        self.rng_seq = jax.random.key(self.seed)
+        self.rng_seq, init_rng = jax.random.split(self.rng_seq)
 
         def _init(rng, *datum):
-            params = self.transform.init(rng, *datum)
+            param_rng, _ = jax.random.split(rng)
+            params = self.transform.init(param_rng, *datum)['params']
             opt_state = self.optimizer.init(params)
             return TrainState(
                 params,
                 opt_state,
             )
     
-        self.rng_seq = hk.PRNGSequence(self.seed)
-        self.train_state = jax.jit(_init)(init_rng, *init_datum)
+        clock = time.time()
+        self.train_state = _init(init_rng, *init_datum)
+        print('Init Time:', time.time() - clock)
+        num_params = sum(
+            x.size for x in jax.tree_util.tree_leaves(self.train_state.params))
 
-        num_params = hk.data_structures.tree_size(self.train_state.params)
         print(f"Model has {num_params:.3e} parameters")
         if self.run: self.run.summary["NUM_PARAMS"] = num_params
 
 
     @functools.partial(jax.jit, static_argnums=(0,))
     def loss(self, params, keys, batch, step):
-        def _apply_losses(params, rng_key, datum: Any, step: int):
-            model_output = self.transform.apply(params, rng_key, *datum, True)
+        
+        def _apply_losses(rng_key, datum: Any):
+            model_output = self.transform.apply(
+                {'params': params}, *datum, True, rngs={'params': rng_key})
             return self.losses(rng_key, model_output, datum, step)
         
-        output, loss, metrics = jax.vmap(_apply_losses, in_axes=(None, 0, 0, None))(params, keys, batch, step)
+        output, loss, metrics = jax.vmap(
+            _apply_losses, 
+            in_axes=(0, 0)
+        )(keys, batch)
+
         loss = jnp.where(jnp.isnan(loss), 0.0, loss)
         metrics = {k: v.mean() for k, v in metrics.items()}
         loss = loss.mean()
@@ -198,44 +215,6 @@ class Trainer:
 
         return output, TrainState(params, opt_state), metrics
     
-    def run_sample(self, rng_seq, state, batch, step):
-        keys = jax.random.split(next(rng_seq), min(9, len(batch)))
-
-        if hasattr(self, 'sample_params'):
-            params_ = {**state.params, **self.sample_params}
-        else: 
-            params_ = state.params
-
-        batched = inner_stack(batch[:9])
-
-        start = time.time()
-        samples, trajectories = jax.vmap(
-            self.sample_model, 
-            in_axes=(None, 0, 0)
-        )(params_, keys, batched)
-        end = time.time()
-        samples = inner_split(samples)
-    
-        sample_metrics = {}
-        if step != 0: 
-            sample_metrics.update({'sample_time': end - start})
-
-        if self.plot_mode == 'samples':
-            self.sample_plot(self.run, samples, None)
-
-        elif self.plot_mode == 'trajectory':
-            trajectories = [inner_split(traj) for traj in inner_split(trajectories)]
-            self.sample_plot(self.run, trajectories, None)
-
-        if self.sample_metrics:
-            sample_metrics_ = defaultdict(list)
-            for sample, batch in zip(samples, batch):
-                sample_metrics = self.sample_metrics(sample, batch)
-                for k, v in sample_metrics.items():
-                    sample_metrics_[k].append(v)
-            sample_metrics.update({k: np.mean(v) for k, v in sample_metrics_.items()})
-
-        return sample_metrics
 
     def epoch(
         self,
@@ -261,7 +240,9 @@ class Trainer:
                 batch = tree_stack([[d.to_pytree()] if type(d)!= list else [d_.to_pytree() for d_ in d] for d in data])
 
                 total_step = epoch * len(loader) + step
-                keys = jax.random.split(next(self.rng_seq), len(data))
+                
+                self.rng_seq, subkey = jax.random.split(self.rng_seq)
+                keys = jax.random.split(subkey, len(data))
 
                 batched = batch
                 output, new_train_state, step_metrics = self.update(
@@ -297,11 +278,13 @@ class Trainer:
                                 for (k, v) in step_metrics.items()},
                                 'step':total_step,
                             }
-                        )    
-
-
-                    if self.save_model and total_step % self.save_every == 0:
-                        self.save_model(self.train_state.params)
+                        )
+                    if self.run and total_step % self.save_every == 0:
+                        checkpoint = { 'params': self.train_state.params }
+                        save_args = orbax_utils.save_args_from_target(checkpoint)
+                        if os.path.exists(self.run.dir + '/checkpoints'):
+                            shutil.rmtree(self.run.dir + '/checkpoints')
+                        self.checkpointer.save(self.run.dir + '/checkpoints', checkpoint, save_args=save_args)
 
                 for (k, v) in step_metrics.items():
                     epoch_metrics[k].append(v)                
@@ -323,3 +306,56 @@ class Trainer:
         print("Training...")
         for epoch in tqdm(range(self.num_epochs), position=0):
             self.epoch(epoch=epoch)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # def run_sample(self, rng_seq, state, batch, step):
+    #     keys = jax.random.split(next(rng_seq), min(9, len(batch)))
+
+    #     if hasattr(self, 'sample_params'):
+    #         params_ = {**state.params, **self.sample_params}
+    #     else: 
+    #         params_ = state.params
+
+    #     batched = inner_stack(batch[:9])
+
+    #     start = time.time()
+    #     samples, trajectories = jax.vmap(
+    #         self.sample_model, 
+    #         in_axes=(None, 0, 0)
+    #     )(params_, keys, batched)
+    #     end = time.time()
+    #     samples = inner_split(samples)
+    
+    #     sample_metrics = {}
+    #     if step != 0: 
+    #         sample_metrics.update({'sample_time': end - start})
+
+    #     if self.plot_mode == 'samples':
+    #         self.sample_plot(self.run, samples, None)
+
+    #     elif self.plot_mode == 'trajectory':
+    #         trajectories = [inner_split(traj) for traj in inner_split(trajectories)]
+    #         self.sample_plot(self.run, trajectories, None)
+
+    #     if self.sample_metrics:
+    #         sample_metrics_ = defaultdict(list)
+    #         for sample, batch in zip(samples, batch):
+    #             sample_metrics = self.sample_metrics(sample, batch)
+    #             for k, v in sample_metrics.items():
+    #                 sample_metrics_[k].append(v)
+    #         sample_metrics.update({k: np.mean(v) for k, v in sample_metrics_.items()})
+
+    #     return sample_metrics

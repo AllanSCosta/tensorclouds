@@ -101,12 +101,11 @@ class AtomPermLoss(LossFunction):
 class MirrorInterpolantLoss(LossFunction):
 
     def _call(self, _, model_output: ModelOutput, __: ProteinDatum):
-
         pred = model_output.noise_prediction
         z = model_output.noise
 
-        feature_dot1, coord_dot1 = pred.dot(pred)
-        feature_dot2, coord_dot2 = (-z).dot(pred)
+        feature_dot1, coord_dot1 = pred.norm()
+        feature_dot2, coord_dot2 = pred.dot(-z)
 
         feature_loss = 0.5 * feature_dot1 + feature_dot2
         coord_loss = 0.5 * coord_dot1 + coord_dot2
@@ -117,7 +116,7 @@ class MirrorInterpolantLoss(LossFunction):
         return model_output, feature_loss + coord_loss, { 'feature_loss': feature_loss, 'coord_loss': coord_loss }    
 
 
-class StepInterpolantLoss(LossFunction):
+class StochasticInterpolantLoss(LossFunction):
 
     def _call(self, _, model_output: ModelOutput, __: ProteinDatum):    
         noise_prediction, drift_prediction = model_output 
@@ -129,18 +128,18 @@ class StepInterpolantLoss(LossFunction):
         z = noise_prediction.target
 
         def stochastic_interpolant_loss(pred, target):
-            feature_dot1, coord_dot1 = pred.dot(pred)
-            feature_dot2, coord_dot2 = target.dot(pred)
+            feature_dot1, coord_dot1 = pred.norm()            
+            feature_dot2, coord_dot2 = pred.dot(target)
 
             feature_loss = 0.5 * feature_dot1 + feature_dot2
             coord_loss = 0.5 * coord_dot1 + coord_dot2
 
-            feature_loss = feature_loss.mean()
+            feature_loss = 100 * feature_loss.mean()
             coord_loss = 100 * coord_loss.mean()
             return feature_loss, coord_loss
                 
-        feature_loss_d, coord_loss_d = stochastic_interpolant_loss(pred_d, d)
-        feature_loss_z, coord_loss_z = stochastic_interpolant_loss(pred_z, z)        
+        feature_loss_d, coord_loss_d = stochastic_interpolant_loss(pred_d, -d)
+        feature_loss_z, coord_loss_z = stochastic_interpolant_loss(pred_z, -z)        
 
         return model_output, feature_loss_d + coord_loss_d + feature_loss_z + coord_loss_z, { 'feature_loss_d': feature_loss_d, 'coord_loss_d': coord_loss_d, 'feature_loss_z': feature_loss_z, 'coord_loss_z': coord_loss_z }
 
@@ -148,7 +147,7 @@ class StepInterpolantLoss(LossFunction):
 class TensorCloudMatchingLoss(LossFunction):
 
     def _call(
-        self, rng_key, model_output: ModelOutput, _: ProteinDatum
+        self, rng_key, model_output: ModelOutput, _: ProteinDatum, reduction = 'sum',
     ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
         
         if type(model_output) == tuple:
@@ -170,17 +169,23 @@ class TensorCloudMatchingLoss(LossFunction):
 
         features_loss = jnp.square(pred.irreps_array.array - target.irreps_array.array)
         features_loss = reweight * features_loss
-        features_loss = jnp.sum(features_loss)
+
+        features_mask = (target.mask_irreps_array * e3nn.ones(target.irreps_array.irreps, target.irreps_array.shape[:-1])).array
+        features_loss = 100 * jnp.sum(features_loss * features_mask) 
+        if reduction == 'mean':
+            features_loss = features_loss / (jnp.sum(features_mask) + 1e-6)
 
         features_pred_norm = jnp.square(pred.irreps_array.array).sum(-1)
         features_pred_norm = jnp.mean(features_pred_norm)
 
         features_target_norm = jnp.square(target.irreps_array.array).sum(-1)
-        features_target_norm = jnp.mean(features_target_norm) 
+        features_target_norm = jnp.mean(features_target_norm)
 
         coord_loss = jnp.square(pred.coord - target.coord)
         coord_loss = reweight * coord_loss
-        coord_loss = jnp.sum(coord_loss)
+        coord_loss = 100 * jnp.sum(coord_loss * target.mask_coord[..., None])
+        if reduction == 'mean':
+            coord_loss = coord_loss / (jnp.sum(target.mask_coord) + 1e-6)
 
         metrics = dict(
             features_loss=features_loss, 
@@ -195,7 +200,7 @@ class TensorCloudMatchingLoss(LossFunction):
 class VectorCloudMatchingLoss(LossFunction):
 
     def _call(
-        self, rng_key, model_output: ModelOutput, _: ProteinDatum
+        self, rng_key, model_output: ModelOutput, _: ProteinDatum, ca_index: int = 1
     ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
         pred, target = model_output.prediction, model_output.target
 
@@ -204,8 +209,8 @@ class VectorCloudMatchingLoss(LossFunction):
         target_vectors = rearrange(target.irreps_array.filter(vec_irreps).array, '... (v e) -> ... v e', e=3)
         vec_mask = (target_vectors.sum(-1) != 0.0)
 
-        pred_vectors = pred_vectors + pred.coord[:, None, :]
-        target_vectors = target_vectors + target.coord[:, None, :]
+        pred_vectors = pred_vectors.at[..., ca_index, :].set(0.0) + pred.coord[:, None, :]
+        target_vectors = target_vectors.at[..., ca_index, :].set(0.0) + target.coord[:, None, :]
 
         pred_vectors = rearrange(pred_vectors, 'r v ... -> (r v) ...')        
         target_vectors = rearrange(target_vectors, 'r v ... -> (r v) ...')
@@ -234,6 +239,27 @@ class VectorCloudMatchingLoss(LossFunction):
 
         return model_output, vectors_loss + coord_loss, { 'vectors_loss': vectors_loss, 'coord_loss': coord_loss }
 
+
+class FrameLoss(LossFunction):
+
+    def _call(
+        self, rng_key, model_output: ModelOutput, _: ProteinDatum
+    ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
+        pred_frame = model_output.frame_prediction
+        if pred_frame == None:
+            return model_output, 0.0, {}
+        
+        vectors = pred_frame.filter('1e').array
+        vectors = rearrange(vectors, '... (v e) -> ... v e', e=3)
+        
+        vector_norm = safe_norm(vectors)
+        vec_ij = rearrange(vectors, '... i c -> ... i () c') * rearrange(vectors, '... j c -> ... () j c')
+        dot_ij = vec_ij.mean(-1)
+
+        loss_norm = jnp.square(vector_norm - 1.0).sum()
+        loss_dot = jnp.square(dot_ij).mean()
+
+        return model_output, 50 * loss_norm + 100 * loss_dot, { 'loss_norm': loss_norm.mean(), 'loss_dot': loss_dot.mean() }
 
 
 class InternalVectorLoss(LossFunction):

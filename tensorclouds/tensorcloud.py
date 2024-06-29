@@ -6,27 +6,23 @@ import jax.numpy as jnp
 import numpy as np
 
 from typing import List
+from flax import struct
 
+@struct.dataclass
 class TensorCloud:
 
-    def __init__(
-        self, 
-        irreps_array: e3nn.IrrepsArray, 
-        mask_irreps_array: jnp.ndarray, 
-        coord: jnp.ndarray, 
-        mask_coord: jnp.array
-    ):
-        self.irreps_array = irreps_array
-        self.mask_irreps_array = mask_irreps_array
-        self.coord = coord
-        self.mask_coord = mask_coord
+    irreps_array: e3nn.IrrepsArray
+    mask_irreps_array: jnp.ndarray
+    coord: jnp.ndarray
+    mask_coord: jnp.ndarray
+
 
     @classmethod
     def empty(cls, irreps: e3nn.Irreps):
         dim = sum(mul * ir.dim for mul, ir in irreps)
         return cls(
             irreps_array=e3nn.IrrepsArray(irreps=irreps, array=np.zeros((0, dim))),
-            mask_irreps_array=np.zeros(0, dtype=bool),
+            mask_irreps_array=np.zeros((0, irreps.num_irreps), dtype=bool),
             coord=np.zeros((0, 3)),
             mask_coord=np.zeros(0, dtype=bool),
         )
@@ -40,7 +36,7 @@ class TensorCloud:
 
     @property
     def mask(self) -> jnp.ndarray:
-        return self.mask_irreps_array & self.mask_coord
+        return self.mask_coord
     
     def replace(self, **kwargs):
         return TensorCloud(
@@ -69,7 +65,7 @@ class TensorCloud:
         dim = sum(mul * ir.dim for mul, ir in irreps)
         return cls(
             irreps_array=e3nn.IrrepsArray(irreps=irreps, array=np.zeros(shape + (dim,))),
-            mask_irreps_array=np.ones(shape, dtype=bool),
+            mask_irreps_array=np.ones((shape, irreps.num_irreps), dtype=bool),
             coord=np.zeros(shape + (3,)),
             mask_coord=np.ones(shape, dtype=bool),
         )
@@ -150,7 +146,10 @@ class TensorCloud:
         )
     
     def __radd__(self, other):
-        return self.__add__(other)        
+        return self.__add__(other)
+
+    def __mul__(self, scalar: float) -> 'TensorCloud':
+        return self.__rmul__(scalar)
 
     def __rmul__(self, scalar: float) -> 'TensorCloud':
         if getattr(scalar, 'shape', None) and len(scalar.shape) > 0 and scalar.shape[0] == 2:
@@ -177,16 +176,29 @@ class TensorCloud:
             mask_coord=self.mask_coord
         )
     
-    def dot(self, other: 'TensorCloud') -> jnp.ndarray:
-        mask = self.mask & other.mask
-        
-        features_dot = self.irreps_array.array * other.irreps_array.array
-        features_dot = (features_dot * mask[..., None]).sum(axis=-1) 
-        
-        coord_dot = self.coord * other.coord
-        coord_dot = (coord_dot * mask[..., None]).sum(axis=-1)
+    def dot(self, other):
+        mask_features = self.mask_irreps_array & other.mask_irreps_array 
 
+        features_dot = mask_features * e3nn.IrrepsArray(
+            self.irreps_array.irreps,
+            self.irreps_array.array * other.irreps_array.array
+        )
+        features_dot = features_dot.array.sum(axis=-1)
+
+        mask_coord = self.mask_coord & other.mask_coord
+        coord_dot = self.coord * other.coord
+        coord_dot = (mask_coord[..., None] * coord_dot).sum(axis=-1)
+        
         return features_dot, coord_dot
+
+    def norm(self):
+        mask_features = self.mask_irreps_array
+        mask_coord = self.mask_coord
+        features_norm = (mask_features * self.irreps_array).array ** 2
+        features_norm = features_norm.sum(axis=-1)
+        coord_norm = self.coord ** 2
+        coord_norm = (mask_coord[..., None] * coord_norm).sum(axis=-1)
+        return features_norm, coord_norm
 
     def __getitem__(self, index: int) -> 'TensorCloud':
         return TensorCloud(
@@ -197,4 +209,4 @@ class TensorCloud:
         )
 
 
-register_pytree(TensorCloud)
+# register_pytree(TensoCloud)

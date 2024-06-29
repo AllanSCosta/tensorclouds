@@ -1,4 +1,4 @@
-import haiku as hk
+from flax import linen as nn
 import jax.numpy as jnp
 
 from model.base.sequence_convolution import convolution_indices
@@ -10,7 +10,7 @@ from einops import repeat
 import jax
 
 
-class Upsample(hk.Module):
+class Upsample(nn.Module):
     def __init__(
         self,
         irreps_out: e3nn.Irreps,
@@ -67,7 +67,7 @@ class Upsample(hk.Module):
         )
         assert new_coord.shape == (reverse_seq_len, 3)
 
-        irreps_array = e3nn.haiku.Linear(self.irreps_out)(state.irreps_array)
+        irreps_array = e3nn.flax.Linear(self.irreps_out)(state.irreps_array)
         output_windows = e3nn.IrrepsArray(
             self.irreps_out, repeat(irreps_array.array, "i d -> i k d", k=k)
         )
@@ -89,7 +89,7 @@ class Upsample(hk.Module):
         )
 
 
-class Downsample(hk.Module):
+class Downsample(nn.Module):
     def __init__(
         self,
         irreps_out: e3nn.Irreps,
@@ -134,7 +134,7 @@ class Downsample(hk.Module):
 
         num_neighbors = jnp.sum(conv_mask_coord, axis=1)
         # have everyone present scores and use them as weights next coordinate:
-        relative_weights = e3nn.haiku.Linear("0e")(conv_irreps_array).array
+        relative_weights = e3nn.flax.Linear("0e")(conv_irreps_array).array
         minus_inf = jnp.finfo(relative_weights.dtype).min
         relative_weights = jnp.where(
             conv_mask_coord[:, :, None], relative_weights, minus_inf
@@ -148,7 +148,7 @@ class Downsample(hk.Module):
         # compute new mask coordinates:
         new_mask_coord = num_neighbors > 0
 
-        new_irreps_array = e3nn.haiku.Linear(self.irreps_out)(conv_irreps_array)
+        new_irreps_array = e3nn.flax.Linear(self.irreps_out)(conv_irreps_array)
         new_irreps_array = e3nn.IrrepsArray(
             new_irreps_array.irreps, new_irreps_array.array.mean(-2)
         )

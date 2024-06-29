@@ -1,5 +1,7 @@
 from functools import partial
 from typing import Any, List, Tuple
+
+import numpy as np
 import jax
 import jax.numpy as jnp
 import haiku as hk
@@ -344,10 +346,15 @@ def protein_to_tensor_cloud(protein):
         '23x0e + 14x1e', 
         jnp.concatenate([scalars, vectors], axis=-1)
     )
+    
+    # if type(mask) == np.ndarray:
+        # mask[..., 1] = False
+    # else:
+        # mask.at[..., 1].set(False)
 
     state = TensorCloud(
         irreps_array=irreps_array,
-        mask_irreps_array=res_mask,
+        mask_irreps_array=mask,
         coord=ca_coord,
         mask_coord=res_mask,
     )

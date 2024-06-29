@@ -3,7 +3,7 @@ from typing import Callable, List, Tuple
 from einops import rearrange, repeat
 
 import e3nn_jax as e3nn
-import haiku as hk
+from flax import linen as nn
 import jax
 import jax.numpy as jnp
 
@@ -15,34 +15,20 @@ from .profile import profile
 from ..tensorcloud import TensorCloud 
 
 
-class CompleteSpatialConvolution(hk.Module):
-    def __init__(
-        self,
-        irreps_out: e3nn.Irreps,
-        *,
-        radial_cut: float,
-        radial_bins: int = 32,
-        radial_basis: str = "gaussian",
-        edge_irreps: e3nn.Irreps = e3nn.Irreps("0e + 1e + 2e"),
-        norm: bool = True,
-        k_seq: int = 16,
-        attention: bool = False,
-        activation: Callable = jax.nn.silu,
-        move: bool = True,
-    ):
-        super().__init__()
-        self.irreps_out = e3nn.Irreps(irreps_out)
-        self.radial_cut = radial_cut
-        self.radial_bins = radial_bins
-        self.radial_basis = radial_basis
-        self.edge_irreps = e3nn.Irreps(edge_irreps)
-        self.norm = norm
-        self.activation = activation
-        self.attention = attention
-        self.move = move
-        self.k_seq = k_seq
+class CompleteSpatialConvolution(nn.Module):
+    irreps_out: e3nn.Irreps
+    radial_cut: float
+    radial_bins: int = 32
+    radial_basis: str = "gaussian"
+    edge_irreps: e3nn.Irreps = e3nn.Irreps("0e + 1e + 2e")
+    norm: bool = True
+    k_seq: int = 16
+    attention: bool = False
+    activation: Callable = jax.nn.silu
+    move: bool = True
 
-    def _call(self, state: TensorCloud) -> TensorCloud:
+    @nn.compact
+    def __call__(self, state: TensorCloud) -> TensorCloud:
         seq_len = state.irreps_array.shape[0]
         assert state.mask.shape == (seq_len,)
         assert state.coord.shape == (seq_len, 3)
@@ -77,11 +63,11 @@ class CompleteSpatialConvolution(hk.Module):
         )
         ang_embed = ang_embed * cross_mask[..., None].astype(ang_embed.array.dtype)
 
-        messages_i = e3nn.haiku.Linear(self.irreps_out)(
+        messages_i = e3nn.flax.Linear(self.irreps_out)(
             e3nn.tensor_product(ang_embed, features_i)
         )
 
-        messages_j = e3nn.haiku.Linear(self.irreps_out)(
+        messages_j = e3nn.flax.Linear(self.irreps_out)(
             e3nn.tensor_product(ang_embed, features_j)
         )
 
@@ -113,10 +99,10 @@ class CompleteSpatialConvolution(hk.Module):
         relative_seq_pos = jnp.where(cross_mask, relative_seq_pos, 0)
 
         relative_seq_pos = relative_seq_pos + k_seq
-        relative_seq_pos = hk.Embed(vocab_size=2*k_seq+1, embed_dim=32)(relative_seq_pos)
+        relative_seq_pos = nn.Embed(num_embeddings=2*k_seq+1, features=32)(relative_seq_pos)
 
         rad_embed = e3nn.concatenate([relative_seq_pos, rad_embed, features_i.filter('0e'), messages.filter('0e')], axis=-1).regroup()
-        rad_embed = e3nn.haiku.MultiLayerPerceptron(
+        rad_embed = e3nn.flax.MultiLayerPerceptron(
             [self.radial_bins, messages.irreps.num_irreps],
             self.activation,
             with_bias=False,
@@ -127,22 +113,14 @@ class CompleteSpatialConvolution(hk.Module):
 
         features_aggr = e3nn.sum(messages, axis=1) / (jnp.sum(cross_mask, axis=1, keepdims=True) + 1e-6)
         features_aggr = features_aggr * (jnp.sum(cross_mask, axis=1, keepdims=True) > 1)
-        features = e3nn.haiku.Linear(self.irreps_out)(features_aggr)
+        features = e3nn.flax.Linear(self.irreps_out)(features_aggr)
         
         if self.move:
-            update = 1e-3 * e3nn.haiku.Linear("1e")(features).array
+            update = 1e-3 * e3nn.flax.Linear("1e")(features).array
             new_coord = state.coord + update
             state = state.replace(coord=new_coord)
 
         return state.replace(irreps_array=features)
-
-    def __call__(self, state: TensorCloud) -> TensorCloud:
-        state = Residual(self._call)(state)
-        # state = self._call(state)
-        if self.norm:
-            state = state.replace(
-                irreps_array=EquivariantLayerNorm()(state.irreps_array))
-        return state
 
 
 
@@ -191,8 +169,8 @@ def knn(
 
 
 
-class kNNSpatialConvolution(hk.Module):
-    def __init__(
+class kNNSpatialConvolution(nn.Module):
+    def setup(
         self,
         irreps_out: e3nn.Irreps,
         *,
@@ -207,7 +185,6 @@ class kNNSpatialConvolution(hk.Module):
         move: bool = True,
         envelope: bool = False,
     ):
-        super().__init__()
         self.irreps_out = e3nn.Irreps(irreps_out)
         self.radial_cut = radial_cut
         self.radial_bins = radial_bins
@@ -294,7 +271,7 @@ class kNNSpatialConvolution(hk.Module):
 
         nei_states = nei_mask[:, :, None] * state.irreps_array[nei_indices, :]
         # Angular part:
-        messages = e3nn.haiku.Linear(self.irreps_out)(
+        messages = e3nn.flax.Linear(self.irreps_out)(
             e3nn.concatenate([e3nn.tensor_product(ang_embed, nei_states), ang_embed], axis=-1).regroup()
         )
         assert messages.shape == (seq_len, k, messages.irreps.dim)
@@ -302,7 +279,7 @@ class kNNSpatialConvolution(hk.Module):
         # Radial part:
         features_expanded = repeat(features.filter('0e').array, '... d -> ... k d', k=k)
         rad_embed = e3nn.concatenate([messages.filter('0e'), rad_embed, features_expanded], axis=-1).regroup()
-        mix = e3nn.haiku.MultiLayerPerceptron(
+        mix = e3nn.flax.MultiLayerPerceptron(
             [self.radial_bins, messages.irreps.num_irreps],
             self.activation,
             with_bias=True,
@@ -318,7 +295,7 @@ class kNNSpatialConvolution(hk.Module):
 
         # Update coordinates:
         if self.move:
-            update = 1e-3 * e3nn.haiku.Linear("1e")(features).array
+            update = 1e-3 * e3nn.flax.Linear("1e")(features).array
             new_coord = state.coord + update
             state = state.replace(coord=new_coord)
 
@@ -334,117 +311,117 @@ class kNNSpatialConvolution(hk.Module):
 
 
 
-class IPA(hk.Module):
-    def __init__(
-        self,
-        irreps_out: e3nn.Irreps,
-        *,
-        radial_cut: float,
-        radial_bins: int = 32,
-        radial_basis: str = "fourier",
-        edge_irreps: e3nn.Irreps = e3nn.Irreps("0e + 1e + 2e"),
-        norm: bool = True,
-        attention: bool = False,
-        activation: Callable = jax.nn.silu,
-        move: bool = False,
-    ):
-        super().__init__()
-        self.irreps_out = e3nn.Irreps(irreps_out)
-        self.radial_cut = radial_cut
-        self.radial_bins = radial_bins
-        self.radial_basis = radial_basis
-        self.edge_irreps = e3nn.Irreps(edge_irreps)
-        self.norm = norm
-        self.activation = activation
-        self.attention = attention
-        self.move = move
+# class IPA(nn.Module):
+#     def __init__(
+#         self,
+#         irreps_out: e3nn.Irreps,
+#         *,
+#         radial_cut: float,
+#         radial_bins: int = 32,
+#         radial_basis: str = "fourier",
+#         edge_irreps: e3nn.Irreps = e3nn.Irreps("0e + 1e + 2e"),
+#         norm: bool = True,
+#         attention: bool = False,
+#         activation: Callable = jax.nn.silu,
+#         move: bool = False,
+#     ):
+#         super().__init__()
+#         self.irreps_out = e3nn.Irreps(irreps_out)
+#         self.radial_cut = radial_cut
+#         self.radial_bins = radial_bins
+#         self.radial_basis = radial_basis
+#         self.edge_irreps = e3nn.Irreps(edge_irreps)
+#         self.norm = norm
+#         self.activation = activation
+#         self.attention = attention
+#         self.move = move
 
-    def _call(self, state: TensorCloud) -> TensorCloud:
-        seq_len = state.irreps_array.shape[0]
-        assert state.mask.shape == (seq_len,)
-        assert state.coord.shape == (seq_len, 3)
-        irreps_in = state.irreps_array.irreps
+#     def _call(self, state: TensorCloud) -> TensorCloud:
+#         seq_len = state.irreps_array.shape[0]
+#         assert state.mask.shape == (seq_len,)
+#         assert state.coord.shape == (seq_len, 3)
+#         irreps_in = state.irreps_array.irreps
 
-        features = state.irreps_array
-        coord = state.coord
+#         features = state.irreps_array
+#         coord = state.coord
 
-        if seq_len == 1:
-            print('[WARNING] Skipping Spatial Convolution - seq_len == 1')
-            return state
+#         if seq_len == 1:
+#             print('[WARNING] Skipping Spatial Convolution - seq_len == 1')
+#             return state
 
-        features_i = e3nn.IrrepsArray(features.irreps, repeat(features.array, 'i h -> i j h', j=seq_len))
-        features_j = e3nn.IrrepsArray(features.irreps, repeat(features.array, 'j h -> i j h', i=seq_len))
+#         features_i = e3nn.IrrepsArray(features.irreps, repeat(features.array, 'i h -> i j h', j=seq_len))
+#         features_j = e3nn.IrrepsArray(features.irreps, repeat(features.array, 'j h -> i j h', i=seq_len))
 
-        coord_i = repeat(coord, 'i d -> i j d', j=seq_len)
-        coord_j = repeat(coord, 'j d -> i j d', i=seq_len)
+#         coord_i = repeat(coord, 'i d -> i j d', j=seq_len)
+#         coord_j = repeat(coord, 'j d -> i j d', i=seq_len)
 
-        mask_coord_i = repeat(state.mask_coord, 'i -> i j', j=seq_len)
-        mask_coord_j = repeat(state.mask_coord, 'j -> i j', i=seq_len)
-        cross_mask = (mask_coord_i & mask_coord_j)
+#         mask_coord_i = repeat(state.mask_coord, 'i -> i j', j=seq_len)
+#         mask_coord_j = repeat(state.mask_coord, 'j -> i j', i=seq_len)
+#         cross_mask = (mask_coord_i & mask_coord_j)
 
-        n_heads = 2
-        # irreps_attn = features_i.irreps // n_heads
+#         n_heads = 2
+#         # irreps_attn = features_i.irreps // n_heads
 
-        # GENERALIZED INVARIANT POINT ATTENTION
+#         # GENERALIZED INVARIANT POINT ATTENTION
 
-        # [ i j h d/h ]
-        keys = e3nn.haiku.Linear(features_i.irreps)(features_i).mul_to_axis(n_heads)
-        queries = e3nn.haiku.Linear(features_j.irreps)(features_j).mul_to_axis(n_heads)
+#         # [ i j h d/h ]
+#         keys = e3nn.flax.Linear(features_i.irreps)(features_i).mul_to_axis(n_heads)
+#         queries = e3nn.flax.Linear(features_j.irreps)(features_j).mul_to_axis(n_heads)
 
-        # [ i j h d/h c ]
-        vec_keys = rearrange(keys.filter('1e').array, '... (d c) -> ... d c', c=3) + coord_i[..., None, None, :]
-        vec_queries = rearrange(queries.filter('1e').array, '... (d c) -> ... d c', c=3) + coord_j[..., None, None, :]
+#         # [ i j h d/h c ]
+#         vec_keys = rearrange(keys.filter('1e').array, '... (d c) -> ... d c', c=3) + coord_i[..., None, None, :]
+#         vec_queries = rearrange(queries.filter('1e').array, '... (d c) -> ... d c', c=3) + coord_j[..., None, None, :]
         
-        # [ i j h d/h c ] 
-        delta_vecs = (vec_queries - vec_keys)
+#         # [ i j h d/h c ] 
+#         delta_vecs = (vec_queries - vec_keys)
         
-        # [ i j h ]
-        vec_scores = -jnp.sum(delta_vecs**2, axis=(-1, -2))
+#         # [ i j h ]
+#         vec_scores = -jnp.sum(delta_vecs**2, axis=(-1, -2))
 
-        # [ i j d ]
-        scalars_i = features_i.filter('0e')
-        scalars_j = features_j.filter('0e')
+#         # [ i j d ]
+#         scalars_i = features_i.filter('0e')
+#         scalars_j = features_j.filter('0e')
 
-        # [ i j d ] + [ i j d ] -> [ i j h d/h ]
-        scalars_i = scalars_i.mul_to_axis(n_heads)
-        scalars_j = scalars_j.mul_to_axis(n_heads)
+#         # [ i j d ] + [ i j d ] -> [ i j h d/h ]
+#         scalars_i = scalars_i.mul_to_axis(n_heads)
+#         scalars_j = scalars_j.mul_to_axis(n_heads)
 
-        # [ i j h ]
-        scalar_scores = jnp.sum(scalars_i * scalars_j, axis=-1)
+#         # [ i j h ]
+#         scalar_scores = jnp.sum(scalars_i * scalars_j, axis=-1)
 
-        # [ i j h ]
-        attention_scores = scalar_scores + vec_scores
-        attention = jnp.where(cross_mask[..., None], attention_scores, jnp.finfo(attention_scores.dtype).min)
+#         # [ i j h ]
+#         attention_scores = scalar_scores + vec_scores
+#         attention = jnp.where(cross_mask[..., None], attention_scores, jnp.finfo(attention_scores.dtype).min)
         
-        # [ i j h ]
-        attention = jax.nn.softmax(attention, axis=-2)
-        attention = attention * cross_mask[..., None]
+#         # [ i j h ]
+#         attention = jax.nn.softmax(attention, axis=-2)
+#         attention = attention * cross_mask[..., None]
 
-        # [ i j 3 ]
-        delta_coord = (coord_j - coord_i) * cross_mask[..., None]
-        delta_coord = e3nn.IrrepsArray(e3nn.Irreps("1x1e"), delta_coord)
+#         # [ i j 3 ]
+#         delta_coord = (coord_j - coord_i) * cross_mask[..., None]
+#         delta_coord = e3nn.IrrepsArray(e3nn.Irreps("1x1e"), delta_coord)
 
-        # [ i j h d/h ]
-        values = e3nn.haiku.Linear(features_j.irreps)(
-            # [ i j h+3 ]
-            e3nn.concatenate([features_j, delta_coord], axis=-1).regroup()
-        ).mul_to_axis(n_heads)
+#         # [ i j h d/h ]
+#         values = e3nn.flax.Linear(features_j.irreps)(
+#             # [ i j h+3 ]
+#             e3nn.concatenate([features_j, delta_coord], axis=-1).regroup()
+#         ).mul_to_axis(n_heads)
         
-        # [ i j h d/h ] -> [ i h d/h ]
-        features_aggr = e3nn.sum(attention[..., None] * values, axis=1)
+#         # [ i j h d/h ] -> [ i h d/h ]
+#         features_aggr = e3nn.sum(attention[..., None] * values, axis=1)
 
-        # [ i h d/h ] -> [ i d ]
-        features_aggr = features_aggr.axis_to_mul()
+#         # [ i h d/h ] -> [ i d ]
+#         features_aggr = features_aggr.axis_to_mul()
 
-        # [ i d ]
-        features = e3nn.haiku.Linear(self.irreps_out)(features_aggr)
+#         # [ i d ]
+#         features = e3nn.flax.Linear(self.irreps_out)(features_aggr)
 
-        return state.replace(irreps_array=features)
+#         return state.replace(irreps_array=features)
 
-    def __call__(self, state: TensorCloud) -> TensorCloud:
-        state = Residual(self._call)(state)
-        if self.norm:
-            state = state.replace(
-                irreps_array=EquivariantLayerNorm()(state.irreps_array))
-        return state
+#     def __call__(self, state: TensorCloud) -> TensorCloud:
+#         state = Residual(self._call)(state)
+#         if self.norm:
+#             state = state.replace(
+#                 irreps_array=EquivariantLayerNorm()(state.irreps_array))
+#         return state
 

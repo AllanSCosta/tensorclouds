@@ -32,24 +32,36 @@ class NormalDistribution():
         self.coords_scale = coords_scale
 
     def sample(
-        self, key: chex.PRNGKey, leading_shape: Tuple[int, ...] = (), mask: jnp.ndarray = None
-    ) -> TensorCloud:  # TODO(Ilan): add option for custom mask..
+        self, key: chex.PRNGKey, leading_shape: Tuple[int, ...] = (), mask_coord: jnp.ndarray = None, mask_features: jnp.ndarray = None
+    ) -> TensorCloud:  
         """Sample from the distribution."""
+
+        if mask_coord is None:
+            mask_coord = jnp.ones(leading_shape, dtype=bool)
+        if mask_features is None:
+            mask_features = e3nn.IrrepsArray(
+                self.irreps_in,
+                jnp.ones(leading_shape + (self.irreps_in.num_irreps,), dtype=bool),
+            )
+
         irreps_key, coords_key = jax.random.split(key)
         irreps = (
             e3nn.normal(self.irreps_in, leading_shape=leading_shape, key=irreps_key)
             * self.irreps_scale
         )
         coords = jax.random.normal(coords_key, (*leading_shape, 3)) * self.coords_scale
-        if mask is not None:
-            irreps = irreps * mask[..., None]
-            coords = coords * mask[..., None]
-            
+
+        mask_features_arr = (e3nn.ones(self.irreps_in) * mask_features).array
+        coords = mask_coord[..., None] * coords
+        irreps = e3nn.IrrepsArray(
+            self.irreps_in,
+            mask_features_arr * irreps.array,
+        )
         return TensorCloud(
             irreps_array=irreps,
-            mask_irreps_array=jnp.ones(leading_shape, dtype=bool),
+            mask_irreps_array=mask_features,
             coord=coords,
-            mask_coord=jnp.ones(leading_shape, dtype=bool),
+            mask_coord=mask_coord,
         )
 
     def log_likelihood(self, x: TensorCloud) -> chex.Array:

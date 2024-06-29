@@ -2,21 +2,17 @@ from typing import Callable
 from typing import Union
 
 import e3nn_jax as e3nn
-import haiku as hk
+from flax import linen as nn
 import jax
 
 from ..tensorcloud import TensorCloud 
 
 
-class Residual(hk.Module):
-    def __init__(
-        self,
-        function: Callable[[TensorCloud], TensorCloud],
-        name: Union[str, None] = None,
-    ):
-        super().__init__(name)
-        self.function = function
+class Residual(nn.Module):
 
+    function: Callable[[TensorCloud], TensorCloud]
+
+    @nn.compact
     def __call__(self, state: TensorCloud) -> TensorCloud:
         assert state.irreps_array.ndim == 2
         assert state.mask.ndim == 1
@@ -42,10 +38,10 @@ class Residual(hk.Module):
         if state.irreps_array.shape == new_state.irreps_array.shape:
             features = state.irreps_array + new_state.irreps_array
         else:
-            features = e3nn.haiku.Linear(new_state.irreps_array.irreps)(
+            features = e3nn.flax.Linear(new_state.irreps_array.irreps)(
                 e3nn.concatenate(
                     [
-                        state.irreps_array * state.mask_irreps_array[:, None],
+                        state.irreps_array,
                         new_state.irreps_array,
                     ]
                 )

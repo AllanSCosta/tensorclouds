@@ -6,7 +6,7 @@ from .self_interaction import SelfInteraction
 
 
 import e3nn_jax as e3nn
-import haiku as hk
+from flax import linen as nn
 import jax.numpy as jnp
 
 from .sequence_convolution import SequenceConvolution
@@ -17,7 +17,7 @@ from .layer_norm import EquivariantLayerNorm
 from ..tensorcloud import TensorCloud 
 from .utils import multiscale_irreps
 
-class DecoderBlock(hk.Module):
+class DecoderBlock(nn.Module):
     def __init__(
         self,
         irreps_out,
@@ -48,7 +48,7 @@ class DecoderBlock(hk.Module):
         return state, state
 
 
-class Decoder(hk.Module):
+class Decoder(nn.Module):
     def __init__(
         self,
         irreps: e3nn.Irreps,
@@ -93,13 +93,13 @@ class Decoder(hk.Module):
         if self.skip_connections:
             if is_training:
                 will_skip = jax.random.uniform(
-                    hk.next_rng_key(),
+                    self.make_rng('will_skip'),
                     shape=(1,),
                     minval=0,
                     maxval=1,
                 ) > self.dropout
                 skip_bound = jax.random.randint(
-                    hk.next_rng_key(),
+                    self.make_rng('skip_bound'),
                     shape=(1,),
                     minval=0,
                     maxval=(len(self.layers) + 1),

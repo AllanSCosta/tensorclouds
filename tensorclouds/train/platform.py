@@ -81,12 +81,11 @@ class Platform:
         print(json.dumps(yaml.safe_load(to_yaml(self.cfg)), indent=4))
 
         def _train_wrapper(trainer, env, zen_cfg) -> None:
-            trainer_ = trainer(run=self.run, save_model=self.save_model)
-            trainer_.train()
+            return trainer(run=self.run, save_model=self.save_model)
 
         train = zen(_train_wrapper, pre_call=_setup)
         train.validate(self.cfg)
-        return functools.partial(train, _Zen__cfg=self.cfg)
+        return train(_Zen__cfg=self.cfg)
 
     def save_model(self, model_params):
         self.checkpoint_index = 0

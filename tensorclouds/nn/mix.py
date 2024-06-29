@@ -1,5 +1,5 @@
 import e3nn_jax as e3nn
-import haiku as hk
+from flax import linen as nn
 import jax
 
 from .layer_norm import EquivariantLayerNorm
@@ -9,7 +9,7 @@ from .sequence_convolution import SequenceConvolution
 from ..tensorcloud import TensorCloud 
 
 
-class MixingBlock(hk.Module):
+class MixingBlock(nn.Module):
     def __init__(
         self,
         irreps_out: e3nn.Irreps,
@@ -27,7 +27,6 @@ class MixingBlock(hk.Module):
         self,
         state: TensorCloud,
     ):
-        @hk.remat
         def f(state: TensorCloud) -> TensorCloud:
             state = SequenceConvolution(
                 self.irreps_out,

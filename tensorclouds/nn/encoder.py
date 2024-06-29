@@ -4,7 +4,7 @@ import jax
 from .mix import MixingBlock
 
 import e3nn_jax as e3nn
-import haiku as hk
+from flax import linen as nn
 
 from .sequence_convolution import SequenceConvolution
 from .utils import multiscale_irreps
@@ -14,7 +14,7 @@ from ..tensorcloud import TensorCloud
 from .self_interaction import SelfInteraction
 
 
-class Encoder(hk.Module):
+class Encoder(nn.Module):
 
     def __init__(
         self,

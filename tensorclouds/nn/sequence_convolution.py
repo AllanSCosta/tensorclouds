@@ -1,5 +1,5 @@
 import e3nn_jax as e3nn
-import haiku as hk
+from flax import linen as nn
 import jax
 import jax.numpy as jnp
 
@@ -35,7 +35,7 @@ def convolution_indices(
     return moving_window(indices, kernel, stride)
 
 
-class SequenceConvolution(hk.Module):
+class SequenceConvolution(nn.Module):
     def __init__(
         self,
         irreps_out: e3nn.Irreps,
@@ -93,7 +93,7 @@ class SequenceConvolution(hk.Module):
         # compute new coordinates:
         # if self.weighted:
         #     # have everyone present scores and use them as weights next coordinate:
-        #     relative_weights = e3nn.haiku.Linear("0e")(conv_irreps_array).array
+        #     relative_weights = e3nn.flax.Linear("0e")(conv_irreps_array).array
         #     minus_inf = jnp.finfo(relative_weights.dtype).min
         #     relative_weights = jnp.where(
         #         conv_mask_coord[:, :, None], relative_weights, minus_inf
@@ -103,7 +103,7 @@ class SequenceConvolution(hk.Module):
         #     new_coord = jnp.sum(conv_coord * relative_weights, axis=1)
         # else:
         #     relative_arrows = (
-        #         e3nn.haiku.Linear(f"1x1e")(conv_irreps_array).array * 0.001
+        #         e3nn.flax.Linear(f"1x1e")(conv_irreps_array).array * 0.001
         #     )
         #     new_coord = (
         #         (relative_arrows + conv_coord) * conv_mask_coord[:, :, None]
@@ -128,7 +128,7 @@ class SequenceConvolution(hk.Module):
         assert conv_vector.shape == (new_seq_len, k**2 * 3)
 
         # mix irreps_array and vector to get new irreps_array:
-        new_irreps_array = e3nn.haiku.Linear(self.irreps_out)(
+        new_irreps_array = e3nn.flax.Linear(self.irreps_out)(
             e3nn.concatenate([conv_irreps_array.axis_to_mul(), conv_vector]).regroup()
         )
         assert new_irreps_array.shape == (new_seq_len, new_irreps_array.irreps.dim)
@@ -183,7 +183,7 @@ class SequenceConvolution(hk.Module):
         irreps_array_num_neigh, new_mask_irreps_array = _num_neighbors(irreps_array_dst)
 
         # predict global position for each new leaf
-        relative_arrows = e3nn.haiku.Linear(f"{k}x1e")(irreps_array)
+        relative_arrows = e3nn.flax.Linear(f"{k}x1e")(irreps_array)
         relative_arrows = relative_arrows.mul_to_axis(k).array
         global_arrows = relative_arrows + state.coord[:, None, :]
         assert global_arrows.shape == (seq_len, k, 3)
@@ -196,7 +196,7 @@ class SequenceConvolution(hk.Module):
 
         # transpose-convolve the features
         output_windows = (
-            e3nn.haiku.Linear(k * self.irreps_out)(irreps_array)
+            e3nn.flax.Linear(k * self.irreps_out)(irreps_array)
             .mul_to_axis(k)
             .remove_nones()
         )

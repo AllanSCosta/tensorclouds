@@ -1,25 +1,17 @@
 import e3nn_jax as e3nn
-import haiku as hk
+from flax import linen as nn
 import jax.numpy as jnp
 
 
-class EquivariantLayerNorm(hk.Module):
+class EquivariantLayerNorm(nn.Module):
+    @nn.compact
     def __call__(self, input: e3nn.IrrepsArray) -> e3nn.IrrepsArray:
         outputs = []
-
-        if None in input.list:
-            return input
-        for i, ((mul, ir), x) in enumerate(zip(input.irreps, input.list)):
+        for (_, ir), x in zip(input.irreps, input.list):
             if ir.l == 0:
-                x -= jnp.mean(x, axis=-2, keepdims=True)
-                # x /= (jnp.std(x, axis=-2, keepdims=True) + 1e-6)
-                # x = jnp.where(jnp.isnan(x), 0.0, x)
-            #     x += hk.get_parameter(
-            #         f"bias_{i}", (mul, ir.dim), init=jnp.zeros, dtype=jnp.bfloat16
-            #     )
-                # outputs.append(x)
-                # continue
-            x = x / (rms(x) + 1e-6)
+                x = nn.LayerNorm()(x[..., 0])[..., None]
+            else:
+                x = x / (rms(x) + 1e-6)
             outputs.append(x)
         return e3nn.IrrepsArray.from_list(input.irreps, outputs, input.shape[:-1])
 

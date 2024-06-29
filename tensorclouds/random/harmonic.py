@@ -34,18 +34,23 @@ class HarmonicDistribution():
         self.irreps = irreps
         self.var_features = var_features
         
-    def sample(self, key, leading_shape=(), mask=None):
-        if mask is None:
-            mask = jnp.ones(leading_shape, dtype=bool)
+    def sample(self, key, leading_shape=(), mask_coord=None, mask_features=None):
+        if mask_coord is None:
+            mask_coord = jnp.ones(leading_shape, dtype=bool)
+        if mask_features is None:
+            mask_features = jnp.ones(leading_shape + self.irreps.shape, dtype=bool)
+        
         irreps_key, coords_key = jax.random.split(key)
         features = e3nn.normal(
             self.irreps, leading_shape=leading_shape, key=irreps_key) * self.var_features
+        
         coord = self.P @ (
-            jnp.sqrt(self.D_inv)[:,None] * jax.random.normal(key, (*leading_shape, 3)))
+            jnp.sqrt(self.D_inv)[:,None] * jax.random.normal(coords_key, (*leading_shape, 3)))
+        
         return TensorCloud(
             irreps_array=features,
-            mask_irreps_array=mask,
+            mask_irreps_array=mask_features,
             coord=coord,
-            mask_coord=mask,
+            mask_coord=mask_coord,
         )
     

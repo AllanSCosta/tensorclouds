@@ -1,5 +1,5 @@
 from typing import List
-import haiku as hk
+from flax import linen as nn
 
 from .decoder import Decoder
 from .encoder import Encoder
@@ -7,7 +7,7 @@ from .encoder import Encoder
 from ..tensorcloud import TensorCloud 
 import e3nn_jax as e3nn
 
-class Autoencoder(hk.Module):
+class Autoencoder(nn.Module):
 
     def __init__(
         self, 
