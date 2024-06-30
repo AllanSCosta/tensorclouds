@@ -117,10 +117,12 @@ class TensorCloudStepInterpolant(hk.Module):
 
             dW = jnp.sqrt(dt) * z
             drift = dt * b_hat
-            denoise = -((eps / self.gamma(t)) * dt) * z_hat
-            noise = jnp.sqrt(2 * eps) * dW
+            # denoise = -(jnp.nan_to_num(eps / self.gamma(t)) * dt) * z_hat
+            denoise = -dt * z_hat
+            # noise = jnp.sqrt(2 * eps) * dW
+            noise = jnp.sqrt(2 * self.gamma(t)) * dW
 
-            next_zt = zt + drift #+ (t < 0.8) * (t > 0.2) * (denoise + noise)
+            next_zt = zt + drift + 1 * (denoise + noise)
             next_zt = next_zt.centralize()
 
             next_zt = next_zt.replace(
@@ -131,8 +133,9 @@ class TensorCloudStepInterpolant(hk.Module):
             )
 
             return next_zt, next_zt
-        x0 = self.q_sample(x0)
-        x0 = x0.centralize()
+        if x0 is None:
+            x0 = self.q_sample(x0)
+            x0 = x0.centralize()
         
         return hk.scan(
             update_one_step,
@@ -187,14 +190,14 @@ class TensorCloudStepInterpolant(hk.Module):
 
         if x1 is None:
             x1 = x0
-
-        x0 = self.q_sample(x1)
-        x0, x1 = align_with_rotation(x0, x1)
+            x0 = self.q_sample(x1)
+            x0, x1 = align_with_rotation(x0, x1)
+            x0 = x0.centralize()
+            x1 = x1.centralize()
+        
 
         # Sample time.
         t = jax.random.uniform(hk.next_rng_key())
-        x0 = x0.centralize()
-        x1 = x1.centralize()
 
         # Compute xt at time t.
         xt, z = self.compute_xt(t, x0, x1)
