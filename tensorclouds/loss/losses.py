@@ -26,7 +26,7 @@ class LossFunction:
 
     def _call(
         self, model_output: ModelOutput, ProteinDatum: Dict
-    ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
+    ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
         raise NotImplementedError
 
     def __call__(
@@ -35,7 +35,7 @@ class LossFunction:
         model_output: ModelOutput,
         batch: ProteinDatum,
         step: int,
-    ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
+    ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
         output, loss, metrics = self._call(rng_key, model_output, batch)
         is_activated = jnp.array(self.start_step <= step).astype(loss.dtype)
         loss = loss * is_activated
@@ -98,7 +98,7 @@ class ApplyLossToProteins(LossFunction):
 class AtomPermLoss(LossFunction):
     def _call(
         self, rng_key, model_output: ModelOutput, ground: ProteinDatum
-    ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
+    ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
         loss = model_output.atom_perm_loss
         return model_output, loss.mean(), {"atom_perm_loss": loss.mean()}
 
@@ -170,7 +170,7 @@ class TensorCloudMatchingLoss(LossFunction):
         model_output: ModelOutput,
         _: ProteinDatum,
         reduction="sum",
-    ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
+    ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
 
         if type(model_output) == tuple:
             aggr_loss = 0.0
@@ -226,7 +226,7 @@ class VectorCloudMatchingLoss(LossFunction):
 
     def _call(
         self, rng_key, model_output: ModelOutput, _: ProteinDatum, ca_index: int = 1
-    ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
+    ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
         pred, target = model_output.prediction, model_output.target
 
         vec_irreps = "1e"
@@ -288,7 +288,7 @@ class FrameLoss(LossFunction):
 
     def _call(
         self, rng_key, model_output: ModelOutput, _: ProteinDatum
-    ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
+    ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
         pred_frame = model_output.frame_prediction
         if pred_frame == None:
             return model_output, 0.0, {}
@@ -319,7 +319,7 @@ class InternalVectorLoss(LossFunction):
 
     def _call(
         self, rng_key, model_output: ModelOutput, ground: ProteinDatum
-    ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
+    ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
         def flip_atoms(coord, flips, mask):
             flips_list = jnp.where(mask[..., None], flips, 15)
             p, q = flips_list.T
@@ -479,7 +479,7 @@ class VectorMapLoss(LossFunction):
 
     def _call(
         self, rng_key, prediction: ProteinDatum, ground: ProteinDatum
-    ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
+    ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
 
         all_atom_coords = rearrange(prediction.atom_coord, "... a c -> (... a) c")
         all_atom_coords_ground = rearrange(ground.atom_coord, "... a c -> (... a) c")
@@ -522,7 +522,7 @@ class AllAtomRMSD(LossFunction):
 
     def _call(
         self, rng_key, model_output: ModelOutput, ground: ProteinDatum
-    ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
+    ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
         all_atom_msd = _measure_msd(model_output.datum, ground, mode="all_atom")
         ca_msd = _measure_msd(model_output.datum, ground, mode="CA")
         metrics = dict(
@@ -544,7 +544,7 @@ class CrossEntropyLoss(LossFunction):
 
     def _call(
         self, rng_key, model_output: ModelOutput, ground: ProteinDatum
-    ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
+    ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
         res_logits = model_output.residue_logits
 
         total_loss, metrics = 0.0, {}
@@ -597,7 +597,7 @@ class ChemicalViolationLoss(LossFunction):
 
     def _call(
         self, rng_key, model_output: ModelOutput, ground: ProteinDatum
-    ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
+    ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
         if getattr(self, "key") is None:
             raise ValueError("Must set key before calling ChemicalViolationLoss")
         ground_coords = ground.atom_coord
@@ -837,7 +837,7 @@ class GaussianDivergenceLoss(LossFunction):
 
 class ClassifierLoss(LossFunction):
 
-    def _call(self, rng_key, logits: jnp.ndarray, ground: ProteinDatum):
+    def _call(self, rng_key, logits: jax.Array, ground: ProteinDatum):
         num_logits = logits.shape[-1]
         label = jax.nn.one_hot(ground.fold_label, num_logits)
         cross_entropy = -(label * jax.nn.log_softmax(logits)).sum(-1)
@@ -851,7 +851,7 @@ class ClassifierLoss(LossFunction):
 
 class MultipleBinaryClassifierLoss(LossFunction):
 
-    def _call(self, rng_key, logits: jnp.ndarray, ground: ProteinDatum):
+    def _call(self, rng_key, logits: jax.Array, ground: ProteinDatum):
         log_p = jax.nn.log_sigmoid(logits)
         log_not_p = jax.nn.log_sigmoid(-logits)
 

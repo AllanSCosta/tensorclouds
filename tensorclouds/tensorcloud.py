@@ -13,9 +13,9 @@ from flax import struct
 class TensorCloud:
 
     irreps_array: e3nn.IrrepsArray
-    mask_irreps_array: jnp.ndarray
-    coord: jnp.ndarray
-    mask_coord: jnp.ndarray
+    mask_irreps_array: jax.Array
+    coord: jax.Array
+    mask_coord: jax.Array
 
     @classmethod
     def empty(cls, irreps: e3nn.Irreps):
@@ -35,7 +35,7 @@ class TensorCloud:
         return self.irreps_array.shape[0]
 
     @property
-    def mask(self) -> jnp.ndarray:
+    def mask(self) -> jax.Array:
         return self.mask_coord
 
     def replace(self, **kwargs):

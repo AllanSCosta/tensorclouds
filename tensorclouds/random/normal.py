@@ -33,8 +33,8 @@ class NormalDistribution:
         self,
         key: chex.PRNGKey,
         leading_shape: Tuple[int, ...] = (),
-        mask_coord: jnp.ndarray = None,
-        mask_features: jnp.ndarray = None,
+        mask_coord: jax.Array = None,
+        mask_features: jax.Array = None,
     ) -> TensorCloud:
         """Sample from the distribution."""
 

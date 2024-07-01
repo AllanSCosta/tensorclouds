@@ -19,7 +19,7 @@ def moving_window(a, kernel: int, stride: int):
 
 def convolution_indices(
     sequence_length: int, kernel: int, stride: int, mode: str
-) -> jnp.ndarray:
+) -> jax.Array:
     indices = jnp.arange(0, sequence_length)
 
     if mode.lower() == "same":

@@ -53,8 +53,8 @@ class ModelOutput:
     datum: ProteinDatum
     encoder_internals: List[TensorCloud]
     decoder_internals: List[TensorCloud]
-    atom_perm_loss: jnp.ndarray
-    diff_loss: List[jnp.ndarray]
+    atom_perm_loss: jax.Array
+    diff_loss: List[jax.Array]
 
 
 def rescale_irreps(irreps: e3nn.Irreps, rescale: float, chunk_factor: int = 0):
@@ -119,14 +119,14 @@ def down_conv_seq_len(size: int, kernel: int, stride: int, mode: str) -> int:
     raise ValueError(f"Unknown mode: {mode}")
 
 
-def safe_norm(vector: jnp.ndarray, axis: int = -1) -> jnp.ndarray:
+def safe_norm(vector: jax.Array, axis: int = -1) -> jax.Array:
     """safe_norm(x) = norm(x) if norm(x) != 0 else 1.0"""
     norms_sqr = jnp.sum(vector**2, axis=axis)
     norms = jnp.where(norms_sqr == 0.0, 1.0, norms_sqr) ** 0.5
     return norms
 
 
-def safe_normalize(vector: jnp.ndarray) -> jnp.ndarray:
+def safe_normalize(vector: jax.Array) -> jax.Array:
     return vector / safe_norm(vector)[..., None]
 
 

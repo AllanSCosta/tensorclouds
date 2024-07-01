@@ -30,7 +30,7 @@ class Embed(hk.Module):
         self.embed_dim = embed_dim
         self.w_init = hk.initializers.TruncatedNormal()
 
-    def __call__(self, tokens: jnp.ndarray) -> jnp.ndarray:
+    def __call__(self, tokens: jax.Array) -> jax.Array:
         params = hk.get_parameter(
             "embeddings",
             [self.vocab_size, self.embed_dim],
@@ -209,7 +209,7 @@ class ProteinDatumDecoder(hk.Module):
     def __call__(
         self,
         state: TensorCloud,
-        sequence_token: jnp.ndarray = None,
+        sequence_token: jax.Array = None,
     ) -> ProteinDatum:
         seq_len = state.irreps_array.shape[0]
         assert state.irreps_array.shape == (seq_len, state.irreps_array.irreps.dim)

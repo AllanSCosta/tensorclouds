@@ -10,7 +10,7 @@ import jaxlib
 
 ACCEPTED_FORMATS = [
     np.ndarray,
-    jnp.ndarray,
+    jax.Array,
     jaxlib.xla_extension.ArrayImpl,
     jax.interpreters.partial_eval.DynamicJaxprTracer,
     jax._src.interpreters.batching.BatchTracer,

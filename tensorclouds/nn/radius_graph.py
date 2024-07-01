@@ -9,8 +9,8 @@ from ..tensorcloud import TensorCloud
 
 
 def create_radius_graph(
-    positions: jnp.ndarray, cutoff: float, edge_buffer_size: int
-) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    positions: jax.Array, cutoff: float, edge_buffer_size: int
+) -> Tuple[jax.Array, jax.Array, jax.Array]:
     return jax.pure_callback(
         _create_radius_graph,
         (

@@ -144,7 +144,7 @@ class CompleteSpatialConvolution(nn.Module):
         return state.replace(irreps_array=features)
 
 
-def knn(coord: jnp.ndarray, mask: jnp.ndarray, k: int, k_seq: int = None):
+def knn(coord: jax.Array, mask: jax.Array, k: int, k_seq: int = None):
     n, d = coord.shape
     assert mask.shape == (n,)
     k = min(k, n - 1)
@@ -212,7 +212,7 @@ class kNNSpatialConvolution(nn.Module):
         self.envelope = envelope
 
     def embedding(
-        self, state: TensorCloud, nei_indices: jnp.ndarray, nei_mask: jnp.ndarray
+        self, state: TensorCloud, nei_indices: jax.Array, nei_mask: jax.Array
     ) -> Tuple:
         (seq_len, _) = state.irreps_array.shape
         k = nei_indices.shape[1]
