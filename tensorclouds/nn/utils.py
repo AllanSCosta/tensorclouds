@@ -23,6 +23,7 @@ def l2_norm(tree):
     leaves, _ = tree_flatten(tree)
     return jnp.sqrt(sum(jnp.vdot(x, x) for x in leaves))
 
+
 def clip_grads(grad_tree, max_norm):
     """Clip gradients stored as a pytree of arrays to maximum norm `max_norm`."""
     norm = l2_norm(grad_tree)
@@ -43,7 +44,9 @@ def inner_split(pytree):
     splits = list(zip(*splits))
     return [jax.tree_util.tree_unflatten(defs, split) for split in splits]
 
+
 from ..tensorcloud import TensorCloud
+
 
 @chex.dataclass
 class ModelOutput:
@@ -126,6 +129,7 @@ def safe_norm(vector: jnp.ndarray, axis: int = -1) -> jnp.ndarray:
 def safe_normalize(vector: jnp.ndarray) -> jnp.ndarray:
     return vector / safe_norm(vector)[..., None]
 
+
 import os
 import pickle
 
@@ -137,6 +141,6 @@ class EmbeddingsDataset(PreProcessedDataset):
 
     def __init__(self, path, transform=[]):
         self.path = path
-        with open(os.path.join(path, 'embeddings.pyd'), 'rb') as f:
+        with open(os.path.join(path, "embeddings.pyd"), "rb") as f:
             splits = pickle.load(f)
         super().__init__(splits, transform=transform)

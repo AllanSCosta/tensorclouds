@@ -16,7 +16,6 @@ from moleculib.protein.datum import ProteinDatum
 from moleculib.assembly.datum import AssemblyDatum
 
 
-
 class LossFunction:
     def __init__(
         self, weight: float = 1.0, start_step: int = 0, scheduler: Scheduler = None
@@ -71,8 +70,14 @@ class LossPipe:
 
 
 class ApplyLossToProteins(LossFunction):
-    
-    def __init__(self, weight=1.0, start_step=0, loss_pipe: LossPipe = [], independent: bool = True):
+
+    def __init__(
+        self,
+        weight=1.0,
+        start_step=0,
+        loss_pipe: LossPipe = [],
+        independent: bool = True,
+    ):
         self.losses = loss_pipe
         self.independent = independent
         super().__init__(weight=weight, start_step=start_step)
@@ -80,11 +85,11 @@ class ApplyLossToProteins(LossFunction):
     def __call__(self, rng_key, model_output: ModelOutput, ground: AssemblyDatum, step):
         if self.independent:
             output_protein_data, loss, metrics = jax.vmap(
-                self.losses, 
-                in_axes=(None, 0, 0, None)
-            )(rng_key, model_output.datum.protein_data, ground.protein_data, step)        
+                self.losses, in_axes=(None, 0, 0, None)
+            )(rng_key, model_output.datum.protein_data, ground.protein_data, step)
             model_output = model_output.replace(
-                datum=model_output.datum.replace(protein_data=output_protein_data))
+                datum=model_output.datum.replace(protein_data=output_protein_data)
+            )
         else:
             raise NotImplementedError
         return model_output, loss, metrics
@@ -112,14 +117,18 @@ class MirrorInterpolantLoss(LossFunction):
 
         feature_loss = 100 * feature_loss.mean()
         coord_loss = 100 * coord_loss.mean()
-                
-        return model_output, feature_loss + coord_loss, { 'feature_loss': feature_loss, 'coord_loss': coord_loss }    
+
+        return (
+            model_output,
+            feature_loss + coord_loss,
+            {"feature_loss": feature_loss, "coord_loss": coord_loss},
+        )
 
 
 class StochasticInterpolantLoss(LossFunction):
 
-    def _call(self, _, model_output: ModelOutput, __: ProteinDatum):    
-        noise_prediction, drift_prediction = model_output 
+    def _call(self, _, model_output: ModelOutput, __: ProteinDatum):
+        noise_prediction, drift_prediction = model_output
 
         pred_d = drift_prediction.prediction
         d = drift_prediction.target
@@ -128,7 +137,7 @@ class StochasticInterpolantLoss(LossFunction):
         z = noise_prediction.target
 
         def stochastic_interpolant_loss(pred, target):
-            feature_dot1, coord_dot1 = pred.norm()            
+            feature_dot1, coord_dot1 = pred.norm()
             feature_dot2, coord_dot2 = pred.dot(target)
 
             feature_loss = 0.5 * feature_dot1 + feature_dot2
@@ -137,19 +146,32 @@ class StochasticInterpolantLoss(LossFunction):
             feature_loss = 100 * feature_loss.mean()
             coord_loss = 100 * coord_loss.mean()
             return feature_loss, coord_loss
-                
-        feature_loss_d, coord_loss_d = stochastic_interpolant_loss(pred_d, -d)
-        feature_loss_z, coord_loss_z = stochastic_interpolant_loss(pred_z, -z)        
 
-        return model_output, feature_loss_d + coord_loss_d + feature_loss_z + coord_loss_z, { 'feature_loss_d': feature_loss_d, 'coord_loss_d': coord_loss_d, 'feature_loss_z': feature_loss_z, 'coord_loss_z': coord_loss_z }
+        feature_loss_d, coord_loss_d = stochastic_interpolant_loss(pred_d, -d)
+        feature_loss_z, coord_loss_z = stochastic_interpolant_loss(pred_z, -z)
+
+        return (
+            model_output,
+            feature_loss_d + coord_loss_d + feature_loss_z + coord_loss_z,
+            {
+                "feature_loss_d": feature_loss_d,
+                "coord_loss_d": coord_loss_d,
+                "feature_loss_z": feature_loss_z,
+                "coord_loss_z": coord_loss_z,
+            },
+        )
 
 
 class TensorCloudMatchingLoss(LossFunction):
 
     def _call(
-        self, rng_key, model_output: ModelOutput, _: ProteinDatum, reduction = 'sum',
+        self,
+        rng_key,
+        model_output: ModelOutput,
+        _: ProteinDatum,
+        reduction="sum",
     ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
-        
+
         if type(model_output) == tuple:
             aggr_loss = 0.0
             metrics = defaultdict(float)
@@ -158,11 +180,11 @@ class TensorCloudMatchingLoss(LossFunction):
                 name = re.sub(r"(?<!^)(?=[A-Z])", "_", type(output).__name__).lower()
                 aggr_loss += loss_
                 for key, value in metrics_.items():
-                    metrics[name + '_' + key] = value
+                    metrics[name + "_" + key] = value
             return model_output, aggr_loss, metrics
 
         pred, target = model_output.prediction, model_output.target
-        if hasattr(model_output, 'reweight'):
+        if hasattr(model_output, "reweight"):
             reweight = jax.lax.stop_gradient(model_output.reweight)
         else:
             reweight = 1.0
@@ -170,9 +192,12 @@ class TensorCloudMatchingLoss(LossFunction):
         features_loss = jnp.square(pred.irreps_array.array - target.irreps_array.array)
         features_loss = reweight * features_loss
 
-        features_mask = (target.mask_irreps_array * e3nn.ones(target.irreps_array.irreps, target.irreps_array.shape[:-1])).array
-        features_loss = 100 * jnp.sum(features_loss * features_mask) 
-        if reduction == 'mean':
+        features_mask = (
+            target.mask_irreps_array
+            * e3nn.ones(target.irreps_array.irreps, target.irreps_array.shape[:-1])
+        ).array
+        features_loss = 100 * jnp.sum(features_loss * features_mask)
+        if reduction == "mean":
             features_loss = features_loss / (jnp.sum(features_mask) + 1e-6)
 
         features_pred_norm = jnp.square(pred.irreps_array.array).sum(-1)
@@ -184,17 +209,17 @@ class TensorCloudMatchingLoss(LossFunction):
         coord_loss = jnp.square(pred.coord - target.coord)
         coord_loss = reweight * coord_loss
         coord_loss = 100 * jnp.sum(coord_loss * target.mask_coord[..., None])
-        if reduction == 'mean':
+        if reduction == "mean":
             coord_loss = coord_loss / (jnp.sum(target.mask_coord) + 1e-6)
 
         metrics = dict(
-            features_loss=features_loss, 
+            features_loss=features_loss,
             features_pred_norm=features_pred_norm,
             features_target_norm=features_target_norm,
-            coord_loss=coord_loss
+            coord_loss=coord_loss,
         )
 
-        return model_output, features_loss + coord_loss, metrics        
+        return model_output, features_loss + coord_loss, metrics
 
 
 class VectorCloudMatchingLoss(LossFunction):
@@ -204,40 +229,59 @@ class VectorCloudMatchingLoss(LossFunction):
     ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
         pred, target = model_output.prediction, model_output.target
 
-        vec_irreps = '1e'
-        pred_vectors = rearrange(pred.irreps_array.filter(vec_irreps).array, '... (v e) -> ... v e', e=3)
-        target_vectors = rearrange(target.irreps_array.filter(vec_irreps).array, '... (v e) -> ... v e', e=3)
-        vec_mask = (target_vectors.sum(-1) != 0.0)
+        vec_irreps = "1e"
+        pred_vectors = rearrange(
+            pred.irreps_array.filter(vec_irreps).array, "... (v e) -> ... v e", e=3
+        )
+        target_vectors = rearrange(
+            target.irreps_array.filter(vec_irreps).array, "... (v e) -> ... v e", e=3
+        )
+        vec_mask = target_vectors.sum(-1) != 0.0
 
-        pred_vectors = pred_vectors.at[..., ca_index, :].set(0.0) + pred.coord[:, None, :]
-        target_vectors = target_vectors.at[..., ca_index, :].set(0.0) + target.coord[:, None, :]
+        pred_vectors = (
+            pred_vectors.at[..., ca_index, :].set(0.0) + pred.coord[:, None, :]
+        )
+        target_vectors = (
+            target_vectors.at[..., ca_index, :].set(0.0) + target.coord[:, None, :]
+        )
 
-        pred_vectors = rearrange(pred_vectors, 'r v ... -> (r v) ...')        
-        target_vectors = rearrange(target_vectors, 'r v ... -> (r v) ...')
-        vec_mask = rearrange(vec_mask, 'r v -> (r v)')
-        
+        pred_vectors = rearrange(pred_vectors, "r v ... -> (r v) ...")
+        target_vectors = rearrange(target_vectors, "r v ... -> (r v) ...")
+        vec_mask = rearrange(vec_mask, "r v -> (r v)")
+
         def ij_map(x, distance=True):
-            x_ij = rearrange(x, '... i c -> ... i () c') - rearrange(x, '... j c -> ... () j c')
+            x_ij = rearrange(x, "... i c -> ... i () c") - rearrange(
+                x, "... j c -> ... () j c"
+            )
             return safe_norm(x_ij)[..., None] if distance else x_ij
 
         pred_dist_map = ij_map(pred_vectors)
         target_dist_map = ij_map(target_vectors)
 
-        cross_mask = rearrange(vec_mask, 'i -> i ()') & rearrange(vec_mask, 'j -> () j')        
+        cross_mask = rearrange(vec_mask, "i -> i ()") & rearrange(vec_mask, "j -> () j")
         vectors_loss = jnp.square(pred_dist_map - target_dist_map)
 
-        vectors_loss = jnp.sum(vectors_loss * cross_mask[..., None]) / (jnp.sum(cross_mask) + 1e-6)
+        vectors_loss = jnp.sum(vectors_loss * cross_mask[..., None]) / (
+            jnp.sum(cross_mask) + 1e-6
+        )
 
         pred_coord_dist_map = ij_map(pred.coord)
         target_coord_dist_map = ij_map(target.coord)
 
-        cross_mask = rearrange(target.mask_coord, 'r -> r ()') & rearrange(target.mask_coord, 'r -> () r')
+        cross_mask = rearrange(target.mask_coord, "r -> r ()") & rearrange(
+            target.mask_coord, "r -> () r"
+        )
         coord_loss = jnp.square(pred_coord_dist_map - target_coord_dist_map)
 
-        coord_loss = jnp.sum(coord_loss * cross_mask[..., None]) / (jnp.sum(cross_mask) + 1e-6)
+        coord_loss = jnp.sum(coord_loss * cross_mask[..., None]) / (
+            jnp.sum(cross_mask) + 1e-6
+        )
 
-
-        return model_output, vectors_loss + coord_loss, { 'vectors_loss': vectors_loss, 'coord_loss': coord_loss }
+        return (
+            model_output,
+            vectors_loss + coord_loss,
+            {"vectors_loss": vectors_loss, "coord_loss": coord_loss},
+        )
 
 
 class FrameLoss(LossFunction):
@@ -248,18 +292,24 @@ class FrameLoss(LossFunction):
         pred_frame = model_output.frame_prediction
         if pred_frame == None:
             return model_output, 0.0, {}
-        
-        vectors = pred_frame.filter('1e').array
-        vectors = rearrange(vectors, '... (v e) -> ... v e', e=3)
-        
+
+        vectors = pred_frame.filter("1e").array
+        vectors = rearrange(vectors, "... (v e) -> ... v e", e=3)
+
         vector_norm = safe_norm(vectors)
-        vec_ij = rearrange(vectors, '... i c -> ... i () c') * rearrange(vectors, '... j c -> ... () j c')
+        vec_ij = rearrange(vectors, "... i c -> ... i () c") * rearrange(
+            vectors, "... j c -> ... () j c"
+        )
         dot_ij = vec_ij.mean(-1)
 
         loss_norm = jnp.square(vector_norm - 1.0).sum()
         loss_dot = jnp.square(dot_ij).mean()
 
-        return model_output, 50 * loss_norm + 100 * loss_dot, { 'loss_norm': loss_norm.mean(), 'loss_dot': loss_dot.mean() }
+        return (
+            model_output,
+            50 * loss_norm + 100 * loss_dot,
+            {"loss_norm": loss_norm.mean(), "loss_dot": loss_dot.mean()},
+        )
 
 
 class InternalVectorLoss(LossFunction):
@@ -325,7 +375,6 @@ class InternalVectorLoss(LossFunction):
         return model_output, loss.mean(), {"internal_vector_loss": loss.mean()}
 
 
-
 TS_CUTOFFS = [1, 2, 4, 8]
 HA_CUTOFFS = [0.5, 1, 2, 4]
 
@@ -337,7 +386,7 @@ def _measure_gdt(x: ProteinDatum, y: ProteinDatum, cutoffs):
 
     GDT = jnp.zeros(len(cutoffs))
     dist = jnp.sqrt(jnp.square(ca_x - ca_y).sum(-1))
-    
+
     # iterate over thresholds
     for i, cutoff in enumerate(cutoffs):
         counts = dist <= cutoff
@@ -346,12 +395,13 @@ def _measure_gdt(x: ProteinDatum, y: ProteinDatum, cutoffs):
         GDT = GDT.at[i].set(means)
     return GDT.mean(-1)
 
-def _measure_msd(x: ProteinDatum, y: ProteinDatum, mode='all_atom'):
+
+def _measure_msd(x: ProteinDatum, y: ProteinDatum, mode="all_atom"):
     mask = x.atom_mask & y.atom_mask
     x = x.atom_coord
     y = y.atom_coord
 
-    if mode == 'CA':
+    if mode == "CA":
         x = x[:, 1:2, :]
         y = y[:, 1:2, :]
         mask = mask[:, 1:2].astype(jnp.float32)
@@ -359,13 +409,14 @@ def _measure_msd(x: ProteinDatum, y: ProteinDatum, mode='all_atom'):
         x = x - (x * mask[..., None]).sum(0)[None] / (mask.sum(0)[None] + 1e-6)
         y = y - (y * mask[..., None]).sum(0)[None] / (mask.sum(0)[None] + 1e-6)
         x = x * mask[..., None]
-        y = y * mask[..., None] 
-    
+        y = y * mask[..., None]
+
     dists = jnp.square(x - y).sum(-1)
     dists = (dists * mask).sum() / (mask.sum() + 1e-6)
     dists = dists * (mask.sum() > 0).astype(dists.dtype)
-    
+
     return dists
+
 
 class BottleneckRegularization(LossFunction):
 
@@ -373,26 +424,26 @@ class BottleneckRegularization(LossFunction):
         self,
         weight=1.0,
         start_step=0,
-        max_norm = 1.5,
+        max_norm=1.5,
     ):
         super().__init__(weight=weight, start_step=start_step)
         self.max_norm = max_norm
 
-    def _call(
-        self, rng_key, model_output: ModelOutput, ground: ProteinDatum
-    ):
+    def _call(self, rng_key, model_output: ModelOutput, ground: ProteinDatum):
         skip = model_output.encoder_internals[-1]
         mask = skip.mask_irreps_array
-        
+
         total_loss = 0.0
         metrics = {}
 
-        masked_mean = lambda x: ((x * mask[..., None]).sum((-1, -2)) / mask.sum(-1)) * (mask.sum(-1) > 0).astype(x.dtype)
+        masked_mean = lambda x: ((x * mask[..., None]).sum((-1, -2)) / mask.sum(-1)) * (
+            mask.sum(-1) > 0
+        ).astype(x.dtype)
 
         def _angle_map(x):
             x = safe_normalize(x)
-            xij = rearrange(x, '... i c -> ... i () c')
-            xji = rearrange(x, '... j c -> ... () j c')
+            xij = rearrange(x, "... i c -> ... i () c")
+            xji = rearrange(x, "... j c -> ... () j c")
             return (xij * xji).sum(-1)
 
         for l, zl in enumerate(skip.irreps_array.list):
@@ -401,8 +452,8 @@ class BottleneckRegularization(LossFunction):
             angle_spread = jnp.square(_angle_map(zl)).mean((-1, -2))
 
             metrics[f"skip[l={l}]_norm"] = masked_mean(norms.mean(-1))
-            metrics[f'skip[l={l}]_max_norm'] = jnp.max(norms)
-            metrics[f'skip[l={l}]_angular_spread'] = masked_mean(angle_spread)
+            metrics[f"skip[l={l}]_max_norm"] = jnp.max(norms)
+            metrics[f"skip[l={l}]_angular_spread"] = masked_mean(angle_spread)
 
             l_loss = jax.nn.relu(norms - self.max_norm).sum(-1)
             l_loss = masked_mean(l_loss) + 4 * masked_mean(angle_spread)
@@ -429,7 +480,6 @@ class VectorMapLoss(LossFunction):
     def _call(
         self, rng_key, prediction: ProteinDatum, ground: ProteinDatum
     ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
-
 
         all_atom_coords = rearrange(prediction.atom_coord, "... a c -> (... a) c")
         all_atom_coords_ground = rearrange(ground.atom_coord, "... a c -> (... a) c")
@@ -465,7 +515,7 @@ class VectorMapLoss(LossFunction):
             cross_vector_loss=error,
         )
 
-        return prediction, error, metrics 
+        return prediction, error, metrics
 
 
 class AllAtomRMSD(LossFunction):
@@ -473,8 +523,8 @@ class AllAtomRMSD(LossFunction):
     def _call(
         self, rng_key, model_output: ModelOutput, ground: ProteinDatum
     ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
-        all_atom_msd = _measure_msd(model_output.datum, ground, mode='all_atom')
-        ca_msd = _measure_msd(model_output.datum, ground, mode='CA')
+        all_atom_msd = _measure_msd(model_output.datum, ground, mode="all_atom")
+        ca_msd = _measure_msd(model_output.datum, ground, mode="CA")
         metrics = dict(
             all_atom_rmsd=jnp.sqrt(all_atom_msd + 1e-6),
             ca_rmsd=jnp.sqrt(ca_msd + 1e-6),
@@ -493,7 +543,7 @@ class CrossEntropyLoss(LossFunction):
         return cross_entropy.mean()
 
     def _call(
-        self, rng_key, model_output: ModelOutput, ground: ProteinDatum 
+        self, rng_key, model_output: ModelOutput, ground: ProteinDatum
     ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
         res_logits = model_output.residue_logits
 
@@ -507,7 +557,7 @@ class CrossEntropyLoss(LossFunction):
 
         res_labels = jax.nn.one_hot(labels, 23)
         res_cross_entropy = self._cross_entropy_loss(
-            res_logits, res_labels #, mask=res_mask
+            res_logits, res_labels  # , mask=res_mask
         )
         metrics["res_cross_entropy"] = res_cross_entropy.mean()
         total_loss += res_cross_entropy.mean()
@@ -640,7 +690,6 @@ class DihedralLoss(ChemicalViolationLoss):
         rad = 2 * jnp.arctan2(safe_norm(v1 - v2), safe_norm(v1 + v2))
 
         return rad
-
 
 
 class ClashLoss(LossFunction):
@@ -786,16 +835,18 @@ class GaussianDivergenceLoss(LossFunction):
         return model_output, total_loss, metrics
 
 
-
 class ClassifierLoss(LossFunction):
-    
+
     def _call(self, rng_key, logits: jnp.ndarray, ground: ProteinDatum):
         num_logits = logits.shape[-1]
         label = jax.nn.one_hot(ground.fold_label, num_logits)
-        cross_entropy = -(label * jax.nn.log_softmax(logits)).sum(-1) 
+        cross_entropy = -(label * jax.nn.log_softmax(logits)).sum(-1)
         accuracy = (logits.argmax(-1) == ground.fold_label).astype(jnp.float32).mean()
-        return logits, cross_entropy, dict(cross_entropy=cross_entropy.mean(), accuracy=accuracy)
-
+        return (
+            logits,
+            cross_entropy,
+            dict(cross_entropy=cross_entropy.mean(), accuracy=accuracy),
+        )
 
 
 class MultipleBinaryClassifierLoss(LossFunction):
@@ -805,14 +856,22 @@ class MultipleBinaryClassifierLoss(LossFunction):
         log_not_p = jax.nn.log_sigmoid(-logits)
 
         labels = ground.fold_label[0]
-        bce = -labels * log_p - (1. - labels) * log_not_p
+        bce = -labels * log_p - (1.0 - labels) * log_not_p
         bce = bce.mean()
-    
-        # accuracy for binary cross entropy 
+
+        # accuracy for binary cross entropy
         accuracy = (logits > 0).astype(jnp.float32) == labels
-        labeled_accuracy = ((logits > 0) == labels).astype(jnp.float32) * (labels > 1).astype(jnp.float32)
-        labeled_accuracy = labeled_accuracy.sum() / ((labels > 1).astype(jnp.float32).sum() + 1e-6) 
+        labeled_accuracy = ((logits > 0) == labels).astype(jnp.float32) * (
+            labels > 1
+        ).astype(jnp.float32)
+        labeled_accuracy = labeled_accuracy.sum() / (
+            (labels > 1).astype(jnp.float32).sum() + 1e-6
+        )
 
         accuracy = accuracy.mean()
 
-        return logits, bce, dict(bce=bce, accuracy=accuracy, labeled_accuracy=labeled_accuracy)
+        return (
+            logits,
+            bce,
+            dict(bce=bce, accuracy=accuracy, labeled_accuracy=labeled_accuracy),
+        )

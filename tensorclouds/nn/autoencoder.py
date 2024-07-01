@@ -4,20 +4,21 @@ from flax import linen as nn
 from .decoder import Decoder
 from .encoder import Encoder
 
-from ..tensorcloud import TensorCloud 
+from ..tensorcloud import TensorCloud
 import e3nn_jax as e3nn
+
 
 class Autoencoder(nn.Module):
 
     def __init__(
-        self, 
+        self,
         irreps: e3nn.Irreps,
         layers: List[int],
         rescale: float,
         stride: int,
         kernel_size: int,
     ):
-        super().__init__(name='autoencoder')
+        super().__init__(name="autoencoder")
         self.encoder = Encoder(
             irreps,
             layers,

@@ -11,8 +11,7 @@ from .residual import Residual
 from einops import rearrange
 import jax.numpy as jnp
 
-from ..tensorcloud import TensorCloud 
-
+from ..tensorcloud import TensorCloud
 
 
 class SelfInteraction(nn.Module):
@@ -35,9 +34,9 @@ class SelfInteraction(nn.Module):
             last_layer = idx == len(self.layers) - 1
 
             block = _SelfInteractionBlock(
-                irreps, 
-                chunk_factor=self.chunk_factor, 
-                full_square=self.full_square, 
+                irreps,
+                chunk_factor=self.chunk_factor,
+                full_square=self.full_square,
             )
             if self.residual:
                 state = Residual(block)(state)
@@ -53,9 +52,9 @@ class SelfInteraction(nn.Module):
 
 
 class _SelfInteractionBlock(nn.Module):
-    irreps_out: e3nn.Irreps 
-    chunk_factor: int = 0 
-    full_square: bool = False 
+    irreps_out: e3nn.Irreps
+    chunk_factor: int = 0
+    full_square: bool = False
     symmetric_compression: bool = False
 
     @nn.compact

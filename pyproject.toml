@@ -15,6 +15,7 @@ dependencies = [
     "e3nn_jax",
     "ordered_set",
     "flax",
+    "einops",
 ]
 classifiers = [
     "Intended Audience :: Developers",

@@ -10,7 +10,6 @@ from ..tensorcloud import TensorCloud
 from typing import List, Tuple
 
 
-
 # ==========================
 # ADAPTED BY ALLAN COSTA
 # ORIGINAL AUTHOR OF THE SNIPPET: lucidrains
@@ -26,6 +25,7 @@ def linear_beta_schedule(timesteps):
     beta_start = scale * 0.0001
     beta_end = scale * 0.02
     return jnp.linspace(beta_start, beta_end, timesteps)
+
 
 def sigmoid_beta_schedule(timesteps, start=0, end=3, tau=0.3, clamp_min=1e-5):
     steps = timesteps + 1
@@ -81,10 +81,11 @@ def compute_constants(timesteps, start_at=1.0, scheduler=linear_beta_schedule):
     )
     for key, value in constants.items():
         constants[key] = value[:timesteps]
-    return constants 
+    return constants
 
 
 import chex
+
 
 @chex.dataclass
 class ModelPrediction:
@@ -93,16 +94,14 @@ class ModelPrediction:
     reweight: float
 
 
-
-
 class TensorCloudDiffuser(nn.Module):
 
     network: nn.Module
     irreps: e3nn.Irreps
     var_features: float
     var_coords: float
-    timesteps=1000
-    leading_shape=(1,)
+    timesteps = 1000
+    leading_shape = (1,)
 
     def setup(self):
         for key, val in compute_constants(self.timesteps, start_at=1.0).items():
@@ -114,43 +113,47 @@ class TensorCloudDiffuser(nn.Module):
             coords_mean=jnp.zeros(3),
             coords_scale=self.var_coords,
         )
-    
+
     def sample(
-        self, 
+        self,
         cond: e3nn.IrrepsArray = None,
         mask_coord=None,
         mask_features=None,
     ):
-        
-        def update_one_step(network: nn.Module, xt: TensorCloud, tk: Tuple) -> TensorCloud:      
+
+        def update_one_step(
+            network: nn.Module, xt: TensorCloud, tk: Tuple
+        ) -> TensorCloud:
             t, key = tk
             z = self.normal.sample(
-                key, 
+                key,
                 leading_shape=self.leading_shape,
                 mask_coord=xt.mask_coord,
                 mask_features=xt.mask_irreps_array,
             )
 
             ϵ̂ = network(xt, t, cond=cond)
-        
+
             αt = self.alphas[t]
             ᾱt = self.alphas_cumprod[t]
             σt = jnp.exp(0.5 * self.posterior_log_variance_clipped[t])
 
-            sqrt = lambda x: jnp.sqrt(jnp.maximum(x, 1e-6)) 
-            
-            next_xt = (1/sqrt(αt)) * (xt + (-((1 - αt) / sqrt(1 - ᾱt))) * ϵ̂).centralize() + (t != 0) * σt * z
+            sqrt = lambda x: jnp.sqrt(jnp.maximum(x, 1e-6))
+
+            next_xt = (1 / sqrt(αt)) * (
+                xt + (-((1 - αt) / sqrt(1 - ᾱt))) * ϵ̂
+            ).centralize() + (t != 0) * σt * z
             next_xt = next_xt.centralize()
 
             return next_xt, next_xt
 
         zT = self.normal.sample(
-            self.make_rng(), 
+            self.make_rng(),
             leading_shape=self.leading_shape,
             mask_coord=mask_coord,
             mask_features=mask_features,
         )
-        
+
         ts = jnp.arange(0, self.timesteps)[::-1]
         ks = jax.random.split(self.make_rng(), self.timesteps)
 
@@ -168,24 +171,18 @@ class TensorCloudDiffuser(nn.Module):
             mask_features=x0.mask_irreps_array,
         )
         return (
-            self.sqrt_alphas_cumprod[t] * x0
-            + self.sqrt_one_minus_alphas_cumprod[t] * z
+            self.sqrt_alphas_cumprod[t] * x0 + self.sqrt_one_minus_alphas_cumprod[t] * z
         ), z
 
     def __call__(
-        self, 
-        x0: TensorCloud, 
-        cond: e3nn.IrrepsArray = None,
-        is_training = False
+        self, x0: TensorCloud, cond: e3nn.IrrepsArray = None, is_training=False
     ):
         t = jax.random.randint(self.make_rng(), (), 0, self.num_timesteps)
-        
+
         x0 = x0.centralize()
         xt, z = self.q_sample(x0, t)
         ẑ = self.make_prediction(xt, t, cond=cond)
 
         return ModelPrediction(
-            prediction=ẑ,
-            target=z,
-            reweight=self.loss_weight[t][None]
+            prediction=ẑ, target=z, reweight=self.loss_weight[t][None]
         )

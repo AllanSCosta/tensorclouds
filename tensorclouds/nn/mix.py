@@ -6,7 +6,7 @@ from .layer_norm import EquivariantLayerNorm
 from .residual import Residual
 from .self_interaction import SelfInteraction
 from .sequence_convolution import SequenceConvolution
-from ..tensorcloud import TensorCloud 
+from ..tensorcloud import TensorCloud
 
 
 class MixingBlock(nn.Module):
@@ -48,8 +48,6 @@ class MixingBlock(nn.Module):
         else:
             state = f(state)
 
-        state = state.replace(
-            irreps_array=EquivariantLayerNorm()(state.irreps_array)
-        )
+        state = state.replace(irreps_array=EquivariantLayerNorm()(state.irreps_array))
 
         return state

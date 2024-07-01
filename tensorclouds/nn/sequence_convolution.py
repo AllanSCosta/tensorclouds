@@ -108,7 +108,7 @@ class SequenceConvolution(nn.Module):
         #     new_coord = (
         #         (relative_arrows + conv_coord) * conv_mask_coord[:, :, None]
         #     ).sum(1) / (num_neighbors[:, None] + 1e-6)
-        new_coord = state.coord 
+        new_coord = state.coord
         assert new_coord.shape == (new_seq_len, 3)
 
         # compute new mask coordinates:

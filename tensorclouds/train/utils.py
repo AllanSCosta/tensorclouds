@@ -1,5 +1,4 @@
-
-import jax 
+import jax
 import jax.numpy as jnp
 from jax.tree_util import tree_map, tree_flatten, tree_unflatten, register_pytree_node
 
@@ -10,19 +9,17 @@ import jaxlib
 
 
 ACCEPTED_FORMATS = [
-    np.ndarray, 
-    jnp.ndarray, 
-    jaxlib.xla_extension.ArrayImpl, 
+    np.ndarray,
+    jnp.ndarray,
+    jaxlib.xla_extension.ArrayImpl,
     jax.interpreters.partial_eval.DynamicJaxprTracer,
-    jax._src.interpreters.batching.BatchTracer, 
-    jax._src.core.ShapedArray, 
+    jax._src.interpreters.batching.BatchTracer,
+    jax._src.core.ShapedArray,
 ]
 
 import e3nn_jax as e3nn
 
-ACCEPTED_TYPES = [
-    np.float64, np.float32, np.int64, np.int32, np.bool_
-]
+ACCEPTED_TYPES = [np.float64, np.float32, np.int64, np.int32, np.bool_]
 
 
 def register_pytree(Datum):
@@ -31,9 +28,12 @@ def register_pytree(Datum):
         went_through = False
         for attr, obj in vars(datum).items():
             # NOTE(Allan): come back here and make it universal
-            if (type(obj) == object) or ((type(obj) in ACCEPTED_FORMATS)
-                and (obj.dtype in ACCEPTED_TYPES)) or (type(obj) == e3nn.IrrepsArray):
-                went_through = True 
+            if (
+                (type(obj) == object)
+                or ((type(obj) in ACCEPTED_FORMATS) and (obj.dtype in ACCEPTED_TYPES))
+                or (type(obj) == e3nn.IrrepsArray)
+            ):
+                went_through = True
                 attrs.append(obj)
             else:
                 attrs.append(None)
@@ -45,7 +45,6 @@ def register_pytree(Datum):
         return Datum(**dict(zip(keys, values)))
 
     register_pytree_node(Datum, encode_datum_pytree, decode_datum_pytree)
-
 
 
 def l2_norm(tree):
@@ -73,5 +72,3 @@ def inner_split(pytree):
     ]
     splits = list(zip(*splits))
     return [tree_unflatten(defs, split) for split in splits]
-
-

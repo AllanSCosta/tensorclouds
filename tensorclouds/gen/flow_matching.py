@@ -13,15 +13,15 @@ from typing import List
 
 import chex
 
+
 @chex.dataclass
 class ModelPrediction:
     prediction: TensorCloud
     target: TensorCloud
     reweight: float = 1.0
 
+
 from typing import Tuple
-
-
 
 
 def compute_rotation_for_alignment(x: TensorCloud, y: TensorCloud):
@@ -58,9 +58,7 @@ def align_with_rotation(
     x1: TensorCloud,
 ) -> Tuple[TensorCloud, TensorCloud]:
     """Aligns x0 to x1 via a rotation."""
-    R = compute_rotation_for_alignment(
-        x0, x1
-    )
+    R = compute_rotation_for_alignment(x0, x1)
     coord = e3nn.IrrepsArray("1o", x0.coord)
     rotated_coord = coord.transform_by_matrix(R).array
     x0 = x0.replace(
@@ -70,7 +68,6 @@ def align_with_rotation(
     return x0, x1
 
 
-
 class TensorCloudFlowMatcher(nn.Module):
 
     feature_net: nn.Module
@@ -78,8 +75,8 @@ class TensorCloudFlowMatcher(nn.Module):
     irreps: e3nn.Irreps
     var_features: float
     var_coords: float
-    timesteps=1000
-    leading_shape=(1,)
+    timesteps = 1000
+    leading_shape = (1,)
 
     def setup(self):
         self.dist = NormalDistribution(
@@ -95,54 +92,50 @@ class TensorCloudFlowMatcher(nn.Module):
         #     N = leading_shape[-1],
         # )
 
-
-    def make_prediction(
-        self, x, t, cond=None
-    ):
+    def make_prediction(self, x, t, cond=None):
         pred_feature = self.feature_net(x, t, cond=cond)
         pred_coord = self.coord_net(x, t, cond=cond)
         return x.replace(
             irreps_array=x.mask_irreps_array * pred_feature.irreps_array,
             coord=x.mask_coord * pred_coord.coord,
         )
-    
+
     def sample(
-        self, 
+        self,
         cond: e3nn.IrrepsArray = None,
         num_steps: int = 1000,
         mask_features: jnp.array = None,
         mask_coord: jnp.array = None,
     ):
         dt = 1 / num_steps
-      
+
         def update_one_step(xt: TensorCloud, t: float) -> TensorCloud:
             s = t + dt
-            x̂t = self.make_prediction(xt, t, cond=cond)      
+            x̂t = self.make_prediction(xt, t, cond=cond)
             next_xt = ((s - t) / (1 - t)) * x̂t + ((1 - s) / (1 - t)) * xt
             next_xt = (t < 1.0) * next_xt + (t >= 1.0) * x̂t
-            # v̂t = self.make_prediction(xt, t, cond=cond) 
+            # v̂t = self.make_prediction(xt, t, cond=cond)
             # next_xt = xt + dt * v̂t
             return next_xt, next_xt
 
         x0 = self.dist.sample(
-            self.make_rng(), 
+            self.make_rng(),
             leading_shape=self.leading_shape,
             mask_features=mask_features,
             mask_coord=mask_coord,
         )
-        
+
         ts = jnp.arange(0, 1, dt)
-        
+
         return nn.scan(
             update_one_step,
             variable_broadcast="params",
             split_rngs={"params": True},
         )(self.network, x0, ts)
 
-
     def p_t(self, x1, t: int, sigma_min: float = 1e-2):
         x0 = self.dist.sample(
-            self.make_rng(), 
+            self.make_rng(),
             leading_shape=self.leading_shape,
             mask_coord=x1.mask_coord,
             mask_features=x1.mask_irreps_array,
@@ -150,14 +143,11 @@ class TensorCloudFlowMatcher(nn.Module):
         x0 = x0.centralize()
         x0, x1 = align_with_rotation(x0, x1)
         xt = t * x1 + (1 - t) * x0
-        vt = (x1 + (-x0))
+        vt = x1 + (-x0)
         return xt, vt, x0
-    
+
     def __call__(
-        self, 
-        x1: TensorCloud, 
-        cond: e3nn.IrrepsArray = None,
-        is_training = False
+        self, x1: TensorCloud, cond: e3nn.IrrepsArray = None, is_training=False
     ):
         x1 = x1.centralize()
         t = jax.random.randint(self.make_rng(), (), 0, self.num_timesteps)
@@ -175,4 +165,3 @@ class TensorCloudFlowMatcher(nn.Module):
             target=x1,
             reweight=1,
         )
-

@@ -1,4 +1,3 @@
-
 import chex
 import e3nn_jax as e3nn
 import jax
@@ -8,8 +7,7 @@ from typing import Optional, Tuple
 from ..tensorcloud import TensorCloud
 
 
-
-class NormalDistribution():
+class NormalDistribution:
     """A normal distribution for TensorClouds."""
 
     def __init__(
@@ -32,8 +30,12 @@ class NormalDistribution():
         self.coords_scale = coords_scale
 
     def sample(
-        self, key: chex.PRNGKey, leading_shape: Tuple[int, ...] = (), mask_coord: jnp.ndarray = None, mask_features: jnp.ndarray = None
-    ) -> TensorCloud:  
+        self,
+        key: chex.PRNGKey,
+        leading_shape: Tuple[int, ...] = (),
+        mask_coord: jnp.ndarray = None,
+        mask_features: jnp.ndarray = None,
+    ) -> TensorCloud:
         """Sample from the distribution."""
 
         if mask_coord is None:
