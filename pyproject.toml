@@ -14,6 +14,7 @@ dependencies = [
     "numpy",
     "e3nn_jax",
     "ordered_set",
+    "flax",
 ]
 classifiers = [
     "Intended Audience :: Developers",
