@@ -1,11 +1,10 @@
-from tensorclouds.train.utils import register_pytree
-from einops import rearrange
+from typing import List
 
 import e3nn_jax as e3nn
+import jax
 import jax.numpy as jnp
 import numpy as np
-
-from typing import List
+from einops import rearrange
 from flax import struct
 
 
@@ -19,6 +18,7 @@ class TensorCloud:
 
     @classmethod
     def empty(cls, irreps: e3nn.Irreps):
+        irreps = e3nn.Irreps(irreps)
         dim = sum(mul * ir.dim for mul, ir in irreps)
         return cls(
             irreps_array=e3nn.IrrepsArray(irreps=irreps, array=np.zeros((0, dim))),
@@ -64,12 +64,13 @@ class TensorCloud:
 
     @classmethod
     def zeros(cls, irreps: e3nn.Irreps, shape: tuple) -> "TensorCloud":
+        irreps = e3nn.Irreps(irreps)
         dim = sum(mul * ir.dim for mul, ir in irreps)
         return cls(
             irreps_array=e3nn.IrrepsArray(
                 irreps=irreps, array=np.zeros(shape + (dim,))
             ),
-            mask_irreps_array=np.ones((shape, irreps.num_irreps), dtype=bool),
+            mask_irreps_array=np.ones(shape + (irreps.num_irreps,), dtype=bool),
             coord=np.zeros(shape + (3,)),
             mask_coord=np.ones(shape, dtype=bool),
         )
@@ -222,6 +223,3 @@ class TensorCloud:
             coord=self.coord[index],
             mask_coord=self.mask_coord[index],
         )
-
-
-# register_pytree(TensoCloud)
