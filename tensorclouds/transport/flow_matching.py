@@ -72,10 +72,9 @@ class TensorCloudFlowMatcher(nn.Module):
 
     network: nn.Module
     irreps: e3nn.Irreps
+    leading_shape: Tuple[int]
     var_features: float
     var_coords: float
-    timesteps: int = 1000
-    leading_shape: Tuple =(1,)
 
     def setup(self):
         self.dist = NormalDistribution(
@@ -86,17 +85,23 @@ class TensorCloudFlowMatcher(nn.Module):
             coords_scale=self.var_coords,
         )
 
+        # self.dist = HarmonicDistribution(
+        #     irreps=self.irreps,
+        #     var_features=self.var_features,
+        #     N = leading_shape[-1],
+        # )
+    
 
     def sample(
         self,
         cond: e3nn.IrrepsArray = None,
-        num_steps: int = 1000,
+        num_steps: int = 100,
         mask_features: jnp.array = None,
         mask_coord: jnp.array = None,
     ):
         dt = 1 / num_steps
       
-        def update_one_step(network, xt: TensorCloud, t: float) -> TensorCloud:
+        def update_one_step(network: nn.Module, xt: TensorCloud, t: float) -> TensorCloud:
             v̂t = network(xt, t, cond=cond) 
             next_xt = xt + dt * v̂t
             return next_xt, next_xt
@@ -125,19 +130,19 @@ class TensorCloudFlowMatcher(nn.Module):
         )
         x0 = x0.centralize()
         xt = t * x1 + (1 - t) * x0
-        vt = x1 + (-x0)
-        return xt, vt, x0
-
+        vt = (x1 + (-x0))
+        return xt, vt
+    
     def __call__(
         self, x1: TensorCloud, cond: e3nn.IrrepsArray = None, is_training=False
     ):
         x1 = x1.centralize()
         t = jax.random.uniform(self.make_rng())
-
-        xt, vt, _ = self.p_t(x1, t)
+        xt, vt = self.p_t(x1, t)
         v̂t = self.network(xt, t, cond=cond)
 
         return ModelPrediction(
             prediction=v̂t,
             target=vt,
+            reweight=1,
         )
