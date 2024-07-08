@@ -16,6 +16,7 @@ from ..tensorcloud import TensorCloud
 
 
 class CompleteSpatialConvolution(nn.Module):
+
     irreps_out: e3nn.Irreps
     radial_cut: float
     radial_bins: int = 32
@@ -32,8 +33,6 @@ class CompleteSpatialConvolution(nn.Module):
         seq_len = state.irreps_array.shape[0]
         assert state.mask.shape == (seq_len,)
         assert state.coord.shape == (seq_len, 3)
-        irreps_in = state.irreps_array.irreps
-
         features = state.irreps_array
         coord = state.coord
 
@@ -52,7 +51,11 @@ class CompleteSpatialConvolution(nn.Module):
 
         vectors = (coord_i - coord_j) * cross_mask[..., None]
         norm_sqr = jnp.sum(vectors**2, axis=-1)
-        norm = jnp.sqrt(jnp.where(norm_sqr == 0.0, 1.0, norm_sqr))
+        norm = jnp.where(
+            norm_sqr == 0.0, 0.0,
+            jnp.sqrt(jnp.where(norm_sqr == 0.0, 1.0, norm_sqr))
+        )
+
 
         # Angular embedding:
         ang_embed = e3nn.spherical_harmonics(
@@ -63,9 +66,9 @@ class CompleteSpatialConvolution(nn.Module):
         )
         ang_embed = ang_embed * cross_mask[..., None].astype(ang_embed.array.dtype)
 
-        messages_i = e3nn.flax.Linear(self.irreps_out)(
-            e3nn.tensor_product(ang_embed, features_i)
-        )
+        # messages_i = e3nn.flax.Linear(self.irreps_out)(
+        #     e3nn.tensor_product(ang_embed, features_i)
+        # )
 
         messages_j = e3nn.flax.Linear(self.irreps_out)(
             e3nn.tensor_product(ang_embed, features_j)
@@ -73,7 +76,7 @@ class CompleteSpatialConvolution(nn.Module):
 
 
         messages = e3nn.concatenate([
-            messages_i,
+            # messages_i,
             messages_j,
             ang_embed, 
         ], axis=-1).regroup()
@@ -101,11 +104,11 @@ class CompleteSpatialConvolution(nn.Module):
         relative_seq_pos = relative_seq_pos + k_seq
         relative_seq_pos = nn.Embed(num_embeddings=2*k_seq+1, features=32)(relative_seq_pos)
 
-        rad_embed = e3nn.concatenate([relative_seq_pos, rad_embed, features_i.filter('0e'), messages.filter('0e')], axis=-1).regroup()
+        rad_embed = e3nn.concatenate([relative_seq_pos, rad_embed, messages.filter('0e')], axis=-1).regroup()
         rad_embed = e3nn.flax.MultiLayerPerceptron(
             [self.radial_bins, messages.irreps.num_irreps],
             self.activation,
-            with_bias=False,
+            with_bias=True,
             output_activation=False,
         )(rad_embed)
 

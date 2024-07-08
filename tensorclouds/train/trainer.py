@@ -116,8 +116,12 @@ class Trainer:
                 batch_size=self.batch_size,
                 num_workers=self.num_workers,
                 collate_fn=lambda x: x,
+                shuffle=True,
             ) for split in self.dataset.splits
         }
+
+        if self.batch_size == None:
+            self.batch_size = self.dataset.batch_size
 
         self.train_only = train_only
         self.single_batch = single_batch
@@ -145,13 +149,12 @@ class Trainer:
 
         self.sample_every = sample_every
         self.metrics = defaultdict(list)
-        self.checkpointer = orbax.checkpoint.PyTreeCheckpointer()
 
         self.init()
 
     def init(self):
         print("Initializing Model...")
-        init_datum = self.dataset.splits['train'][0]
+        init_datum = next(iter(self.loaders['train']))[0]
         init_datum = [init_datum.to_pytree()] if type(init_datum) != list else [d.to_pytree() for d in init_datum] 
 
         self.rng_seq = jax.random.key(self.seed)
@@ -236,7 +239,8 @@ class Trainer:
             for step, data in enumerate(pbar):
 
                 if len(data) != self.batch_size:
-                    continue                
+                    continue         
+                       
                 batch = tree_stack([[d.to_pytree()] if type(d)!= list else [d_.to_pytree() for d_ in d] for d in data])
 
                 total_step = epoch * len(loader) + step
@@ -280,11 +284,14 @@ class Trainer:
                             }
                         )
                     if self.run and total_step % self.save_every == 0:
-                        checkpoint = { 'params': self.train_state.params }
-                        save_args = orbax_utils.save_args_from_target(checkpoint)
-                        if os.path.exists(self.run.dir + '/checkpoints'):
-                            shutil.rmtree(self.run.dir + '/checkpoints')
-                        self.checkpointer.save(self.run.dir + '/checkpoints', checkpoint, save_args=save_args)
+                        checkpoint_path = self.run.dir + '/checkpoints'
+                        os.makedirs(checkpoint_path, exist_ok=True)
+                        self.checkpoint_index = 0 # Currently no rule for checkpointing
+                        with open(checkpoint_path + f"/params_{self.checkpoint_index}.npy", "wb") as file:
+                            checkpoint = { 'params': jax.device_get(self.train_state.params) }
+                            pickle.dump(checkpoint, file)
+
+
 
                 for (k, v) in step_metrics.items():
                     epoch_metrics[k].append(v)                

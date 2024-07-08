@@ -73,13 +73,12 @@ def align_with_rotation(
 
 class TensorCloudFlowMatcher(nn.Module):
 
-    feature_net: nn.Module
-    coord_net: nn.Module
+    network: nn.Module
     irreps: e3nn.Irreps
     var_features: float
     var_coords: float
-    timesteps=1000
-    leading_shape=(1,)
+    timesteps: int = 1000
+    leading_shape: Tuple =(1,)
 
     def setup(self):
         self.dist = NormalDistribution(
@@ -89,23 +88,8 @@ class TensorCloudFlowMatcher(nn.Module):
             coords_mean=jnp.zeros(3),
             coords_scale=self.var_coords,
         )
-        # self.dist = HarmonicDistribution(
-        #     irreps=self.irreps,
-        #     var_features=self.var_features,
-        #     N = leading_shape[-1],
-        # )
 
 
-    def make_prediction(
-        self, x, t, cond=None
-    ):
-        pred_feature = self.feature_net(x, t, cond=cond)
-        pred_coord = self.coord_net(x, t, cond=cond)
-        return x.replace(
-            irreps_array=x.mask_irreps_array * pred_feature.irreps_array,
-            coord=x.mask_coord * pred_coord.coord,
-        )
-    
     def sample(
         self, 
         cond: e3nn.IrrepsArray = None,
@@ -115,13 +99,9 @@ class TensorCloudFlowMatcher(nn.Module):
     ):
         dt = 1 / num_steps
       
-        def update_one_step(xt: TensorCloud, t: float) -> TensorCloud:
-            s = t + dt
-            x̂t = self.make_prediction(xt, t, cond=cond)      
-            next_xt = ((s - t) / (1 - t)) * x̂t + ((1 - s) / (1 - t)) * xt
-            next_xt = (t < 1.0) * next_xt + (t >= 1.0) * x̂t
-            # v̂t = self.make_prediction(xt, t, cond=cond) 
-            # next_xt = xt + dt * v̂t
+        def update_one_step(network, xt: TensorCloud, t: float) -> TensorCloud:
+            v̂t = network(xt, t, cond=cond) 
+            next_xt = xt + dt * v̂t
             return next_xt, next_xt
 
         x0 = self.dist.sample(
@@ -148,7 +128,7 @@ class TensorCloudFlowMatcher(nn.Module):
             mask_features=x1.mask_irreps_array,
         )
         x0 = x0.centralize()
-        x0, x1 = align_with_rotation(x0, x1)
+        # x0, x1 = align_with_rotation(x0, x1)
         xt = t * x1 + (1 - t) * x0
         vt = (x1 + (-x0))
         return xt, vt, x0
@@ -160,19 +140,15 @@ class TensorCloudFlowMatcher(nn.Module):
         is_training = False
     ):
         x1 = x1.centralize()
-        t = jax.random.randint(self.make_rng(), (), 0, self.num_timesteps)
+        t = jax.random.uniform(self.make_rng())
 
-        xt, v1, x0 = self.p_t(x1, t)
-        x̂1 = self.make_prediction(xt, t, cond=cond)
-
-        # xt, vt = self.p_t(x1, t)
-        # v̂t = self.make_prediction(xt, t, cond=cond)
+        xt, vt, _ = self.p_t(x1, t)
+        v̂t = self.network(xt, t, cond=cond)
 
         return ModelPrediction(
-            # prediction=v̂t,
-            # target=vt,
-            prediction=x̂1,
-            target=x1,
-            reweight=1,
+            prediction=v̂t,
+            target=vt,
+            # prediction=x̂1,
+            # target=x1,
         )
 

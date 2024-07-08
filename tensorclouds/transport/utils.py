@@ -8,4 +8,3 @@ class ModelPrediction:
     prediction: TensorCloud
     target: dict
     reweight: float = None
-    frame_prediction: e3nn.IrrepsArray

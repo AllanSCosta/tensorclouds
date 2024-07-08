@@ -101,8 +101,8 @@ class TensorCloudDiffuser(nn.Module):
     irreps: e3nn.Irreps
     var_features: float
     var_coords: float
-    timesteps=1000
-    leading_shape=(1,)
+    timesteps: int = 1000
+    leading_shape: Tuple = (1,)
 
     def setup(self):
         for key, val in compute_constants(self.timesteps, start_at=1.0).items():
@@ -178,11 +178,11 @@ class TensorCloudDiffuser(nn.Module):
         cond: e3nn.IrrepsArray = None,
         is_training = False
     ):
-        t = jax.random.randint(self.make_rng(), (), 0, self.num_timesteps)
+        t = jax.random.randint(self.make_rng(), (), 0, self.timesteps)
         
         x0 = x0.centralize()
         xt, z = self.q_sample(x0, t)
-        ẑ = self.make_prediction(xt, t, cond=cond)
+        ẑ = self.network(xt, t, cond=cond)
 
         return ModelPrediction(
             prediction=ẑ,

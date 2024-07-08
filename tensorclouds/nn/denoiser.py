@@ -79,6 +79,7 @@ class Denoiser(nn.Module):
     full_square: bool = False
     conservative: bool = False
     move: bool = False
+    pos_encoding: bool = False
 
     @nn.compact
     def __call__(self, x, t=None, cond=None):
@@ -92,20 +93,21 @@ class Denoiser(nn.Module):
             norm_last=False,
         )(x)
 
-        pos = nn.Embed(
-            num_embeddings=x.irreps_array.shape[0], 
-            features=x.irreps_array.filter('0e').shape[-1]
-        )(jnp.arange(x.irreps_array.shape[0]))
+        if self.pos_encoding:
+            pos = nn.Embed(
+                num_embeddings=x.irreps_array.shape[0], 
+                features=x.irreps_array.filter('0e').shape[-1]
+            )(jnp.arange(x.irreps_array.shape[0]))
 
-        pos = e3nn.IrrepsArray(
-            f"{x.irreps_array.filter('0e').shape[-1]}x0e", pos
-        )
+            pos = e3nn.IrrepsArray(
+                f"{x.irreps_array.filter('0e').shape[-1]}x0e", pos
+            )
 
-        x = x.replace(
-            irreps_array=e3nn.concatenate((
-                x.irreps_array, pos
-            ), axis=-1).regroup() * x.mask_coord[..., None]
-        )
+            x = x.replace(
+                irreps_array=e3nn.concatenate((
+                    x.irreps_array, pos
+                ), axis=-1).regroup() * x.mask_coord[..., None]
+            )
 
         if t is not None:
             x = OnehotTimeEmbed(self.timesteps, self.time_range)(x, t)

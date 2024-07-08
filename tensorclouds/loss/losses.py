@@ -98,34 +98,22 @@ class AtomPermLoss(LossFunction):
         return model_output, loss.mean(), {"atom_perm_loss": loss.mean()}
 
 
-class MirrorInterpolantLoss(LossFunction):
-
-    def _call(self, _, model_output: ModelOutput, __: ProteinDatum):
-        pred = model_output.noise_prediction
-        z = model_output.noise
-
-        feature_dot1, coord_dot1 = pred.norm()
-        feature_dot2, coord_dot2 = pred.dot(-z)
-
-        feature_loss = 0.5 * feature_dot1 + feature_dot2
-        coord_loss = 0.5 * coord_dot1 + coord_dot2
-
-        feature_loss = 100 * feature_loss.mean()
-        coord_loss = 100 * coord_loss.mean()
-                
-        return model_output, feature_loss + coord_loss, { 'feature_loss': feature_loss, 'coord_loss': coord_loss }    
-
-
 class StochasticInterpolantLoss(LossFunction):
 
     def _call(self, _, model_output: ModelOutput, __: ProteinDatum):    
-        noise_prediction, drift_prediction = model_output 
+        if type(model_output) == tuple:
+            aggr_loss = 0.0
+            metrics = defaultdict(float)
+            for output in model_output:
+                _, loss_, metrics_ = self._call(_, output, __)
+                name = re.sub(r"(?<!^)(?=[A-Z])", "_", type(output).__name__).lower()
+                aggr_loss += loss_
+                for key, value in metrics_.items():
+                    metrics[name + '_' + key] = value
+            return model_output, aggr_loss, metrics
 
-        pred_d = drift_prediction.prediction
-        d = drift_prediction.target
-
-        pred_z = noise_prediction.prediction
-        z = noise_prediction.target
+        pred = model_output.prediction
+        target = model_output.target
 
         def stochastic_interpolant_loss(pred, target):
             feature_dot1, coord_dot1 = pred.norm()            
@@ -138,16 +126,13 @@ class StochasticInterpolantLoss(LossFunction):
             coord_loss = 100 * coord_loss.mean()
             return feature_loss, coord_loss
                 
-        feature_loss_d, coord_loss_d = stochastic_interpolant_loss(pred_d, -d)
-        feature_loss_z, coord_loss_z = stochastic_interpolant_loss(pred_z, -z)        
-
-        return model_output, feature_loss_d + coord_loss_d + feature_loss_z + coord_loss_z, { 'feature_loss_d': feature_loss_d, 'coord_loss_d': coord_loss_d, 'feature_loss_z': feature_loss_z, 'coord_loss_z': coord_loss_z }
-
+        features_loss, coord_loss = stochastic_interpolant_loss(pred, -target)
+        return model_output, features_loss + coord_loss, { 'features_loss': features_loss, 'coord_loss': coord_loss }
 
 class TensorCloudMatchingLoss(LossFunction):
 
     def _call(
-        self, rng_key, model_output: ModelOutput, _: ProteinDatum, reduction = 'sum',
+        self, rng_key, model_output: ModelOutput, _: ProteinDatum, reduction = 'mean',
     ) -> Tuple[ModelOutput, jnp.ndarray, Dict[str, float]]:
         
         if type(model_output) == tuple:
@@ -172,6 +157,7 @@ class TensorCloudMatchingLoss(LossFunction):
 
         features_mask = (target.mask_irreps_array * e3nn.ones(target.irreps_array.irreps, target.irreps_array.shape[:-1])).array
         features_loss = 100 * jnp.sum(features_loss * features_mask) 
+                
         if reduction == 'mean':
             features_loss = features_loss / (jnp.sum(features_mask) + 1e-6)
 
@@ -184,6 +170,7 @@ class TensorCloudMatchingLoss(LossFunction):
         coord_loss = jnp.square(pred.coord - target.coord)
         coord_loss = reweight * coord_loss
         coord_loss = 100 * jnp.sum(coord_loss * target.mask_coord[..., None])
+
         if reduction == 'mean':
             coord_loss = coord_loss / (jnp.sum(target.mask_coord) + 1e-6)
 
