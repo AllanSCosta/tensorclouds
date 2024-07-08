@@ -8,7 +8,7 @@ import haiku as hk
 import e3nn_jax as e3nn
 from ..nn.self_interaction import SelfInteraction
 from ..nn.utils import dotdict, safe_norm
-from ..tensorcloud import TensorCloud 
+from ..tensorcloud import TensorCloud
 
 from einops import rearrange, repeat
 from moleculib.protein.alphabet import (
@@ -30,7 +30,7 @@ class Embed(hk.Module):
         self.embed_dim = embed_dim
         self.w_init = hk.initializers.TruncatedNormal()
 
-    def __call__(self, tokens: jnp.ndarray) -> jnp.ndarray:
+    def __call__(self, tokens: jax.Array) -> jax.Array:
         params = hk.get_parameter(
             "embeddings",
             [self.vocab_size, self.embed_dim],
@@ -42,12 +42,12 @@ class Embed(hk.Module):
 
 
 class ProteinDatumEncoder(hk.Module):
-    def __init__(self, irreps: e3nn.Irreps, interact=True, depth: int = 0,rescale=2.0):
+    def __init__(self, irreps: e3nn.Irreps, interact=True, depth: int = 0, rescale=2.0):
         super().__init__()
         self.depth = depth
-        if not str(irreps.filter('2e')):
+        if not str(irreps.filter("2e")):
             dim = irreps[0].mul
-            irreps = irreps + e3nn.Irreps(f'{dim}x2e')
+            irreps = irreps + e3nn.Irreps(f"{dim}x2e")
         self.irreps = irreps
         self.interact = interact
         self.rescale = rescale
@@ -63,11 +63,12 @@ class ProteinDatumEncoder(hk.Module):
 
         embed_dim = self.irreps.filter("0e").dim
 
-        residue_token = datum.residue_token_masked if hasattr(datum, "residue_token_masked") else datum.residue_token
-        residue_token_embed = Embed(
-            vocab_size=23, 
-            embed_dim=embed_dim
-        )(residue_token)
+        residue_token = (
+            datum.residue_token_masked
+            if hasattr(datum, "residue_token_masked")
+            else datum.residue_token
+        )
+        residue_token_embed = Embed(vocab_size=23, embed_dim=embed_dim)(residue_token)
 
         residue_index_embed = Embed(vocab_size=seq_len, embed_dim=embed_dim)(
             jnp.arange(seq_len)
@@ -97,9 +98,12 @@ class ProteinDatumEncoder(hk.Module):
             vecs = vecs.at[indices[:, 1]].set(0.0, mode="drop")
             return vecs
 
-
-        res_coord = datum.atom_coord_masked[:, 1, :] if hasattr(datum, "atom_coord_masked") else datum.atom_coord[:, 1, :]
-        mask_coord = res_coord.sum(-1) != 0.0 
+        res_coord = (
+            datum.atom_coord_masked[:, 1, :]
+            if hasattr(datum, "atom_coord_masked")
+            else datum.atom_coord[:, 1, :]
+        )
+        mask_coord = res_coord.sum(-1) != 0.0
 
         vector_embed = jnp.zeros_like(datum.atom_coord, dtype=jnp.bfloat16)
         vector_embed = jnp.where(
@@ -134,7 +138,8 @@ class ProteinDatumEncoder(hk.Module):
 
         if self.interact:
             state = SelfInteraction(
-                [self.irreps * int(self.rescale)] * self.depth + [self.irreps], norm_last=True
+                [self.irreps * int(self.rescale)] * self.depth + [self.irreps],
+                norm_last=True,
             )(state)
 
         return state
@@ -193,30 +198,33 @@ class ProteinDatumDecoder(hk.Module):
     ):
         super().__init__()
         self.depth = depth
-        if not str(irreps.filter('2e')):
+        if not str(irreps.filter("2e")):
             dim = irreps[0].mul
-            irreps = irreps + e3nn.Irreps(f'{dim}x2e')
+            irreps = irreps + e3nn.Irreps(f"{dim}x2e")
         self.irreps = irreps
         self.interact = interact
         self.rescale = rescale
         self.ca_only = ca_only
 
     def __call__(
-        self, state: TensorCloud, sequence_token: jnp.ndarray = None,
+        self,
+        state: TensorCloud,
+        sequence_token: jax.Array = None,
     ) -> ProteinDatum:
         seq_len = state.irreps_array.shape[0]
         assert state.irreps_array.shape == (seq_len, state.irreps_array.irreps.dim)
         assert state.mask.shape == (seq_len,)
         assert state.coord.shape == (seq_len, 3)
-        
+
         ca_coord = state.coord
 
         invariants = state.irreps_array.filter(keep="0e")
         logits = e3nn.haiku.MultiLayerPerceptron(
-            [invariants.irreps.dim, invariants.irreps.num_irreps, 25], act=jax.nn.silu,
-            output_activation=False
+            [invariants.irreps.dim, invariants.irreps.num_irreps, 25],
+            act=jax.nn.silu,
+            output_activation=False,
         )(invariants).array
-        
+
         res_logits, sos_logits, eos_logits = (
             logits[..., :23],
             logits[..., -1],
@@ -227,7 +235,8 @@ class ProteinDatumDecoder(hk.Module):
             sequence_token = jnp.argmax(res_logits, axis=-1)
             sequence_token = jnp.where(
                 jnp.arange(len(sequence_token)) > eos_logits.argmax(-1),
-                0, sequence_token
+                0,
+                sequence_token,
             )
 
         seq_len = sequence_token.shape[0]
@@ -251,7 +260,7 @@ class ProteinDatumDecoder(hk.Module):
         flips = jnp.where(flips_mask[..., None], flips, 0)
         assert flips.shape == (seq_len, 2, 2), flips.shape
 
-        if not self.ca_only: 
+        if not self.ca_only:
             all_vecs_decoded = SelfInteraction(
                 [self.irreps * int(self.rescale)] * self.depth
                 + [e3nn.Irreps(f"{25}x0e + {23 * 14}x1e + {23}x2e").regroup()],
@@ -259,9 +268,9 @@ class ProteinDatumDecoder(hk.Module):
                 norm_last=False,
             )(state)
 
-            all_vecs_decoded = all_vecs_decoded.irreps_array.filter("1e + 2e").mul_to_axis(
-                23
-            )
+            all_vecs_decoded = all_vecs_decoded.irreps_array.filter(
+                "1e + 2e"
+            ).mul_to_axis(23)
             vecs_decoded = jax.vmap(lambda arr, idx: arr[idx])(
                 all_vecs_decoded, sequence_token
             )
@@ -273,7 +282,7 @@ class ProteinDatumDecoder(hk.Module):
 
             vecs3 = vecs3 * atom_mask[..., None]
             vecs5 = vecs5 * flips_mask[..., None]
-            
+
             assert vecs3.shape == (seq_len, 14, 3), vecs3.shape
             assert vecs5.shape == (seq_len, 2, 5), vecs5.shape
 
@@ -282,7 +291,9 @@ class ProteinDatumDecoder(hk.Module):
                 == repeat(jnp.arange(0, 14), "a -> () a")
             ) * flips_mask[..., None, None]
 
-            flippable = (vecs3[..., None, None, :, :] * flips_extract[..., None]).sum(-2)
+            flippable = (vecs3[..., None, None, :, :] * flips_extract[..., None]).sum(
+                -2
+            )
             center = flippable[..., 0, :]
 
             diff, atom_perm_loss = jax.vmap(jax.vmap(sqrt_2tensor))(vecs5)
@@ -291,11 +302,13 @@ class ProteinDatumDecoder(hk.Module):
             sym_vecs3 = jnp.stack([center + diff, center - diff], axis=-2)
             assert sym_vecs3.shape == (seq_len, 2, 2, 3), sym_vecs3.shape
 
-            atom_perm_loss = (atom_perm_loss * flips_mask).sum() / (flips_mask.sum() + 1e-6)
-
-            sym_vecs3_aggregate = (sym_vecs3[..., None, :] * flips_extract[..., None]).sum(
-                (-3, -4)
+            atom_perm_loss = (atom_perm_loss * flips_mask).sum() / (
+                flips_mask.sum() + 1e-6
             )
+
+            sym_vecs3_aggregate = (
+                sym_vecs3[..., None, :] * flips_extract[..., None]
+            ).sum((-3, -4))
             subs_mask = sym_vecs3_aggregate.sum(-1) > 0
 
             vecs3 = jnp.where(subs_mask[..., None], sym_vecs3_aggregate, vecs3)
@@ -328,29 +341,28 @@ class ProteinDatumDecoder(hk.Module):
 
 
 def protein_to_tensor_cloud(protein):
-    res_token = protein['residue_token']
-    res_mask = protein['atom_mask'][..., 1]
+    res_token = protein["residue_token"]
+    res_mask = protein["atom_mask"][..., 1]
 
     scalars = jax.nn.one_hot(res_token, 23)
     scalars = scalars * res_mask[..., None]
 
-    mask = protein['atom_mask']
-    vectors = protein['atom_coord']
+    mask = protein["atom_mask"]
+    vectors = protein["atom_coord"]
     ca_coord = vectors[..., 1, :]
 
-    vectors = (vectors - ca_coord[..., None, :])
+    vectors = vectors - ca_coord[..., None, :]
     vectors = vectors * mask[..., None]
-    vectors = rearrange(vectors, 'r a c -> r (a c)')
+    vectors = rearrange(vectors, "r a c -> r (a c)")
 
     irreps_array = e3nn.IrrepsArray(
-        '23x0e + 14x1e', 
-        jnp.concatenate([scalars, vectors], axis=-1)
+        "23x0e + 14x1e", jnp.concatenate([scalars, vectors], axis=-1)
     )
-    
+
     # if type(mask) == np.ndarray:
-        # mask[..., 1] = False
+    # mask[..., 1] = False
     # else:
-        # mask.at[..., 1].set(False)
+    # mask.at[..., 1].set(False)
 
     state = TensorCloud(
         irreps_array=irreps_array,
@@ -359,7 +371,7 @@ def protein_to_tensor_cloud(protein):
         mask_coord=res_mask,
     )
 
-    return state 
+    return state
 
 
 def tensor_cloud_to_protein(state, protein=None, backbone_only=False):
@@ -367,17 +379,18 @@ def tensor_cloud_to_protein(state, protein=None, backbone_only=False):
     ca_coord = state.coord
     res_mask = state.mask_coord
 
-    if (str(irreps_array.irreps) == '23x0e+14x1e'):
-        res_logits = jax.nn.softmax(irreps_array.filter('0e').array)
+    if str(irreps_array.irreps) == "23x0e+14x1e":
+        res_logits = jax.nn.softmax(irreps_array.filter("0e").array)
         eos_logits = None
-    elif (str(irreps_array.irreps) == '14x1e'):
+    elif str(irreps_array.irreps) == "14x1e":
         res_logits = None
         eos_logits = None
     else:
-        invariants = irreps_array.filter(keep='0e')
+        invariants = irreps_array.filter(keep="0e")
         logits = e3nn.haiku.MultiLayerPerceptron(
-            [invariants.irreps.dim, invariants.irreps.num_irreps, 25], act=jax.nn.silu,
-            output_activation=False
+            [invariants.irreps.dim, invariants.irreps.num_irreps, 25],
+            act=jax.nn.silu,
+            output_activation=False,
         )(invariants).array
 
         res_logits, sos_logits, eos_logits = (
@@ -385,18 +398,17 @@ def tensor_cloud_to_protein(state, protein=None, backbone_only=False):
             logits[..., -1],
             logits[..., -2],
         )
-        irreps_array = e3nn.haiku.Linear('14x1e')(irreps_array)
+        irreps_array = e3nn.haiku.Linear("14x1e")(irreps_array)
 
     atom_coord = irreps_array.filter("1e").array
-    atom_coord = rearrange(atom_coord, 'r (a c) -> r a c', a=14)
-        
+    atom_coord = rearrange(atom_coord, "r (a c) -> r a c", a=14)
 
     if protein is None and not backbone_only:
         sequence_token = jnp.argmax(res_logits, axis=-1)
     elif protein is None and backbone_only:
-        sequence_token = jnp.full(res_logits.shape[0], all_residues.index('GLY'))
+        sequence_token = jnp.full(res_logits.shape[0], all_residues.index("GLY"))
     else:
-        sequence_token = protein['residue_token']
+        sequence_token = protein["residue_token"]
 
     logit_extract = repeat(sequence_token, "r -> r l", l=23) == repeat(
         jnp.arange(0, 23), "l -> () l"
@@ -405,10 +417,10 @@ def tensor_cloud_to_protein(state, protein=None, backbone_only=False):
     if protein is None:
         atom_token = (logit_extract[..., None] * all_residues_atom_tokens[None]).sum(-2)
         atom_mask = (logit_extract[..., None] * all_residues_atom_mask[None]).sum(-2)
-    else: 
-        atom_token = protein['atom_token']
-        atom_mask = protein['atom_mask']
-        
+    else:
+        atom_token = protein["atom_token"]
+        atom_mask = protein["atom_mask"]
+
     atom_coord = atom_coord.at[..., 1, :].set(0.0)
     atom_coord = atom_coord + ca_coord[..., None, :]
     atom_coord = atom_coord * atom_mask[..., None]
@@ -426,4 +438,4 @@ def tensor_cloud_to_protein(state, protein=None, backbone_only=False):
         atom_mask=atom_mask,
         residue_logits=res_logits,
         eos_logits=eos_logits,
-    )    
+    )

@@ -14,8 +14,9 @@ from .mix import MixingBlock
 from moleculib.protein.datum import ProteinDatum
 from .layer_norm import EquivariantLayerNorm
 
-from ..tensorcloud import TensorCloud 
+from ..tensorcloud import TensorCloud
 from .utils import multiscale_irreps
+
 
 class DecoderBlock(nn.Module):
     def __init__(
@@ -32,12 +33,13 @@ class DecoderBlock(nn.Module):
         if skip is None:
             skip = state.replace(
                 irreps_array=e3nn.IrrepsArray(
-                    state.irreps_array.irreps, 
-                    jnp.zeros_like(state.irreps_array.array)
+                    state.irreps_array.irreps, jnp.zeros_like(state.irreps_array.array)
                 )
             )
         state = state.replace(
-            irreps_array=EquivariantLayerNorm()(state.irreps_array + skip.irreps_array * skip_mask)
+            irreps_array=EquivariantLayerNorm()(
+                state.irreps_array + skip.irreps_array * skip_mask
+            )
         )
         state = MixingBlock(
             irreps_out=self.irreps_out,
@@ -67,7 +69,7 @@ class Decoder(nn.Module):
         self.rescale = rescale
         self.stride = stride
         self.kernel_size = kernel_size
-        self.skip_connections = skip_connections 
+        self.skip_connections = skip_connections
 
         self.dropout = 0.3
         self.list_irreps = multiscale_irreps(
@@ -88,25 +90,27 @@ class Decoder(nn.Module):
             skips = [skips] + [None] * (len(self.layers) - 1)
 
         state = skips[0]
-        internals = [(state, )]
+        internals = [(state,)]
 
         if self.skip_connections:
             if is_training:
-                will_skip = jax.random.uniform(
-                    self.make_rng('will_skip'),
-                    shape=(1,),
-                    minval=0,
-                    maxval=1,
-                ) > self.dropout
+                will_skip = (
+                    jax.random.uniform(
+                        self.make_rng("will_skip"),
+                        shape=(1,),
+                        minval=0,
+                        maxval=1,
+                    )
+                    > self.dropout
+                )
                 skip_bound = jax.random.randint(
-                    self.make_rng('skip_bound'),
+                    self.make_rng("skip_bound"),
                     shape=(1,),
                     minval=0,
                     maxval=(len(self.layers) + 1),
                 )
                 skip_masks = (
-                    will_skip 
-                    | (skip_bound <= jnp.arange(len(self.layers)))
+                    will_skip | (skip_bound <= jnp.arange(len(self.layers)))
                 ).astype(jnp.bfloat16)[::-1]
             else:
                 skip_masks = jnp.ones(
@@ -122,7 +126,7 @@ class Decoder(nn.Module):
 
             skip = skips[idx]
             skip_mask = skip_masks[idx]
-            
+
             decoder_block = hk.transform(
                 DecoderBlock(
                     irreps_out=irreps_in,
@@ -136,9 +140,7 @@ class Decoder(nn.Module):
 
             def apply_block(state, input):
                 params, rng_key = input
-                return decoder_block.apply(
-                    params, rng_key, state, skip, skip_mask
-                )
+                return decoder_block.apply(params, rng_key, state, skip, skip_mask)
 
             state, _ = jax.lax.scan(
                 apply_block,

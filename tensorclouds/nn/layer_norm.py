@@ -16,7 +16,7 @@ class EquivariantLayerNorm(nn.Module):
         return e3nn.IrrepsArray.from_list(input.irreps, outputs, input.shape[:-1])
 
 
-def rms(x: jnp.ndarray) -> jnp.ndarray:
+def rms(x: jax.Array) -> jax.Array:
     # x.shape == (..., mul, dim)
     norms_sqr = jnp.sum(x**2, axis=-1, keepdims=True)  # sum over dim
     mean_norm_sqr = jnp.mean(norms_sqr, axis=-2, keepdims=True)  # mean over mul

@@ -9,7 +9,7 @@ from flax import linen as nn
 from .sequence_convolution import SequenceConvolution
 from .utils import multiscale_irreps
 from .layer_norm import EquivariantLayerNorm
-from ..tensorcloud import TensorCloud 
+from ..tensorcloud import TensorCloud
 
 from .self_interaction import SelfInteraction
 
@@ -85,8 +85,12 @@ class Encoder(nn.Module):
 
             state, _ = jax.lax.scan(apply_block, state, init_block(init_rng, state))
 
-            state.replace(irreps_array=EquivariantLayerNorm()(residual.irreps_array + state.irreps_array))            
-            skip = state.replace(irreps_array=state.irreps_array.filter('0e + 1e'))
+            state.replace(
+                irreps_array=EquivariantLayerNorm()(
+                    residual.irreps_array + state.irreps_array
+                )
+            )
+            skip = state.replace(irreps_array=state.irreps_array.filter("0e + 1e"))
             skips.append(skip)
 
             if idx < len(self.layers) - 1:
@@ -98,7 +102,9 @@ class Encoder(nn.Module):
                     kernel_size=self.kernel_size,
                     mode="valid",
                 )(state)
-                print(f"compressing [{prev_size}] {irreps_in} --> [{state.irreps_array.shape[0]}] {irreps_out}")
+                print(
+                    f"compressing [{prev_size}] {irreps_in} --> [{state.irreps_array.shape[0]}] {irreps_out}"
+                )
                 acc_stride *= self.stride
 
         return skips

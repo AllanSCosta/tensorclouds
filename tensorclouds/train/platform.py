@@ -33,7 +33,9 @@ def _setup(cfg):
         "" if cfg.env.device == "cpu" else str(cfg.env.device)
     )
 
-    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "true" if cfg.env.preallocate else 'false'
+    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = (
+        "true" if cfg.env.preallocate else "false"
+    )
     if not cfg.env.preallocate:
         os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 
@@ -102,7 +104,7 @@ class Platform:
         with open(str(self.path / filename), "rb") as file:
             data = pickle.load(file)
         return data
-    
+
     def save_file(self, filename, data):
         with open(str(self.path / filename), "wb") as file:
             pickle.dump(data, file)

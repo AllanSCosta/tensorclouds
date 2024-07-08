@@ -13,15 +13,15 @@ from typing import List
 
 import chex
 
+
 @chex.dataclass
 class ModelPrediction:
     prediction: TensorCloud
     target: TensorCloud
     reweight: float = 1.0
 
+
 from typing import Tuple
-
-
 
 
 def compute_rotation_for_alignment(x: TensorCloud, y: TensorCloud):
@@ -58,9 +58,7 @@ def align_with_rotation(
     x1: TensorCloud,
 ) -> Tuple[TensorCloud, TensorCloud]:
     """Aligns x0 to x1 via a rotation."""
-    R = compute_rotation_for_alignment(
-        x0, x1
-    )
+    R = compute_rotation_for_alignment(x0, x1)
     coord = e3nn.IrrepsArray("1o", x0.coord)
     rotated_coord = coord.transform_by_matrix(R).array
     x0 = x0.replace(
@@ -68,7 +66,6 @@ def align_with_rotation(
         irreps_array=x0.irreps_array.transform_by_matrix(R),
     )
     return x0, x1
-
 
 
 class TensorCloudFlowMatcher(nn.Module):
@@ -91,7 +88,7 @@ class TensorCloudFlowMatcher(nn.Module):
 
 
     def sample(
-        self, 
+        self,
         cond: e3nn.IrrepsArray = None,
         num_steps: int = 1000,
         mask_features: jnp.array = None,
@@ -105,39 +102,34 @@ class TensorCloudFlowMatcher(nn.Module):
             return next_xt, next_xt
 
         x0 = self.dist.sample(
-            self.make_rng(), 
+            self.make_rng(),
             leading_shape=self.leading_shape,
             mask_features=mask_features,
             mask_coord=mask_coord,
         )
-        
+
         ts = jnp.arange(0, 1, dt)
-        
+
         return nn.scan(
             update_one_step,
             variable_broadcast="params",
             split_rngs={"params": True},
         )(self.network, x0, ts)
 
-
     def p_t(self, x1, t: int, sigma_min: float = 1e-2):
         x0 = self.dist.sample(
-            self.make_rng(), 
+            self.make_rng(),
             leading_shape=self.leading_shape,
             mask_coord=x1.mask_coord,
             mask_features=x1.mask_irreps_array,
         )
         x0 = x0.centralize()
-        # x0, x1 = align_with_rotation(x0, x1)
         xt = t * x1 + (1 - t) * x0
-        vt = (x1 + (-x0))
+        vt = x1 + (-x0)
         return xt, vt, x0
-    
+
     def __call__(
-        self, 
-        x1: TensorCloud, 
-        cond: e3nn.IrrepsArray = None,
-        is_training = False
+        self, x1: TensorCloud, cond: e3nn.IrrepsArray = None, is_training=False
     ):
         x1 = x1.centralize()
         t = jax.random.uniform(self.make_rng())
@@ -148,7 +140,4 @@ class TensorCloudFlowMatcher(nn.Module):
         return ModelPrediction(
             prediction=v̂t,
             target=vt,
-            # prediction=x̂1,
-            # target=x1,
         )
-

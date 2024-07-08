@@ -5,7 +5,7 @@ import e3nn_jax as e3nn
 from flax import linen as nn
 import jax
 
-from ..tensorcloud import TensorCloud 
+from ..tensorcloud import TensorCloud
 
 
 class Residual(nn.Module):

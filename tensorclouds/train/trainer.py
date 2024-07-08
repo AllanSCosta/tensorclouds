@@ -18,16 +18,19 @@ from wandb.sdk.wandb_run import Run
 from torch.utils.data import DataLoader
 import torch
 
+
 def in_notebook():
     try:
         from IPython import get_ipython
-        if 'IPKernelApp' not in get_ipython().config:  # pragma: no cover
+
+        if "IPKernelApp" not in get_ipython().config:  # pragma: no cover
             return False
     except ImportError:
         return False
     except AttributeError:
         return False
     return True
+
 
 if in_notebook():
     from tqdm.notebook import tqdm
@@ -39,6 +42,7 @@ import jax.numpy as jnp
 from flax.training import orbax_utils
 import orbax
 
+
 class TrainState(NamedTuple):
     params: Any
     opt_state: Any
@@ -46,8 +50,10 @@ class TrainState(NamedTuple):
 
 import jax.numpy as jnp
 
+
 def tree_stack(trees):
     return jax.tree_util.tree_map(lambda *v: jnp.stack(v), *trees)
+
 
 def tree_unstack(tree):
     leaves, treedef = jax.tree_util.tree_flatten(tree)
@@ -68,28 +74,22 @@ class Trainer:
         num_workers,
         save_every,
         validate_every,
-
-        save_model: Callable=None,
+        save_model: Callable = None,
         run: Run = None,
-
         single_datum: bool = False,
         single_batch: bool = False,
         train_only: bool = False,
-
         plot_pipe: Callable = None,
         plot_every: int = 1000,
         plot_model: Callable = None,
         # plot_metrics: MetricsPipe = None,
-
         load_weights: bool = False,
         sample_every: int = None,
         sample_model: Callable = None,
         sample_params: str = None,
         sample_plot: Callable = None,
-
         sample_batch_size=None,
         sample_metrics=None,
-
     ):
         self.model = model
         # torch.multiprocessing.set_start_method('spawn')
@@ -108,7 +108,7 @@ class Trainer:
         self.save_model = save_model
         self.run = run
 
-        self.name = self.run.name if run else 'trainer'
+        self.name = self.run.name if run else "trainer"
         self.max_grad = 1000.0
         self.loaders = {
             split: DataLoader(
@@ -116,8 +116,13 @@ class Trainer:
                 batch_size=self.batch_size,
                 num_workers=self.num_workers,
                 collate_fn=lambda x: x,
+<<<<<<< HEAD
                 shuffle=True,
             ) for split in self.dataset.splits
+=======
+            )
+            for split in self.dataset.splits
+>>>>>>> 7936486316ec09da44e78a30886cf6b4885f6ba6
         }
 
         if self.batch_size == None:
@@ -128,16 +133,16 @@ class Trainer:
         self.single_datum = single_datum
 
         if self.single_batch:
-            print('[!!WARNING!!] using single batch')
-            sample_batch = next(iter(self.loaders['train']))
-            self.loaders = { 'train': [sample_batch] * 1000 }
+            print("[!!WARNING!!] using single batch")
+            sample_batch = next(iter(self.loaders["train"]))
+            self.loaders = {"train": [sample_batch] * 1000}
 
         elif self.single_datum:
-            print('[!!WARNING!!] using single datum')
-            sample_batch = next(iter(self.loaders['train']))
+            print("[!!WARNING!!] using single datum")
+            sample_batch = next(iter(self.loaders["train"]))
             sample_datum = sample_batch[0]
             sample_batch = [sample_datum] * self.batch_size
-            self.loaders = { 'train': [sample_batch] * 1000 }
+            self.loaders = {"train": [sample_batch] * 1000}
 
         self.plot_pipe = plot_pipe
         self.plot_every = plot_every
@@ -154,43 +159,51 @@ class Trainer:
 
     def init(self):
         print("Initializing Model...")
+<<<<<<< HEAD
         init_datum = next(iter(self.loaders['train']))[0]
         init_datum = [init_datum.to_pytree()] if type(init_datum) != list else [d.to_pytree() for d in init_datum] 
+=======
+        init_datum = self.dataset.splits["train"][0]
+        init_datum = (
+            [init_datum.to_pytree()]
+            if type(init_datum) != list
+            else [d.to_pytree() for d in init_datum]
+        )
+>>>>>>> 7936486316ec09da44e78a30886cf6b4885f6ba6
 
         self.rng_seq = jax.random.key(self.seed)
         self.rng_seq, init_rng = jax.random.split(self.rng_seq)
 
         def _init(rng, *datum):
             param_rng, _ = jax.random.split(rng)
-            params = self.transform.init(param_rng, *datum)['params']
+            params = self.transform.init(param_rng, *datum)["params"]
             opt_state = self.optimizer.init(params)
             return TrainState(
                 params,
                 opt_state,
             )
-    
+
         clock = time.time()
         self.train_state = _init(init_rng, *init_datum)
-        print('Init Time:', time.time() - clock)
+        print("Init Time:", time.time() - clock)
         num_params = sum(
-            x.size for x in jax.tree_util.tree_leaves(self.train_state.params))
+            x.size for x in jax.tree_util.tree_leaves(self.train_state.params)
+        )
 
         print(f"Model has {num_params:.3e} parameters")
-        if self.run: self.run.summary["NUM_PARAMS"] = num_params
-
+        if self.run:
+            self.run.summary["NUM_PARAMS"] = num_params
 
     @functools.partial(jax.jit, static_argnums=(0,))
     def loss(self, params, keys, batch, step):
-        
+
         def _apply_losses(rng_key, datum: Any):
             model_output = self.transform.apply(
-                {'params': params}, *datum, True, rngs={'params': rng_key})
+                {"params": params}, *datum, True, rngs={"params": rng_key}
+            )
             return self.losses(rng_key, model_output, datum, step)
-        
-        output, loss, metrics = jax.vmap(
-            _apply_losses, 
-            in_axes=(0, 0)
-        )(keys, batch)
+
+        output, loss, metrics = jax.vmap(_apply_losses, in_axes=(0, 0))(keys, batch)
 
         loss = jnp.where(jnp.isnan(loss), 0.0, loss)
         metrics = {k: v.mean() for k, v in metrics.items()}
@@ -217,22 +230,20 @@ class Trainer:
         params = optax.apply_updates(state.params, updates)
 
         return output, TrainState(params, opt_state), metrics
-    
 
-    def epoch(
-        self,
-        epoch
-    ) -> Tuple[Dict, Dict]:
-        
+    def epoch(self, epoch) -> Tuple[Dict, Dict]:
+
         for split in self.loaders.keys():
-            if (self.train_only and split != 'train') or (split != 'train' and epoch % self.validate_every != 0):
+            if (self.train_only and split != "train") or (
+                split != "train" and epoch % self.validate_every != 0
+            ):
                 continue
-            
+
             loader = self.loaders[split]
 
             pbar = tqdm(loader, position=1, disable=False)
             pbar.set_description(f"[{self.name}] {split}@{epoch}")
-            
+
             # batch_size = None
             epoch_metrics = defaultdict(list)
 
@@ -244,7 +255,7 @@ class Trainer:
                 batch = tree_stack([[d.to_pytree()] if type(d)!= list else [d_.to_pytree() for d_ in d] for d in data])
 
                 total_step = epoch * len(loader) + step
-                
+
                 self.rng_seq, subkey = jax.random.split(self.rng_seq)
                 keys = jax.random.split(subkey, len(data))
 
@@ -256,31 +267,43 @@ class Trainer:
                 pbar.set_postfix({"loss": f"{step_metrics['loss']:.3e}"})
 
                 _param_has_nan = lambda agg, p: jnp.isnan(p).any() | agg
-                has_nan = tree_reduce(_param_has_nan, new_train_state.params, initializer=False)
+                has_nan = tree_reduce(
+                    _param_has_nan, new_train_state.params, initializer=False
+                )
 
                 step_metrics.update(dict(has_nan=has_nan))
 
-                if not has_nan and split == 'train':
+                if not has_nan and split == "train":
                     self.train_state = new_train_state
 
-                if (self.plot_pipe is not None) and split == 'train' and total_step % self.plot_every == 0:
+                if (
+                    (self.plot_pipe is not None)
+                    and split == "train"
+                    and total_step % self.plot_every == 0
+                ):
                     self.plot_pipe(self.run, output, batch)
-                
-                if (self.sample_every is not None) and split == 'train' and total_step % self.sample_every == 0:
-                    sample_metrics = self.run_sample(self.rng_seq, self.train_state, batch, total_step)
-                    step_metrics.update(
-                        {f'{k}': v for k, v in sample_metrics.items()}
-                    )
 
-                if split == 'train':
-                    for (k, v) in step_metrics.items():
-                        self.metrics[f'{split}/{k}'].append(float(v))
+                if (
+                    (self.sample_every is not None)
+                    and split == "train"
+                    and total_step % self.sample_every == 0
+                ):
+                    sample_metrics = self.run_sample(
+                        self.rng_seq, self.train_state, batch, total_step
+                    )
+                    step_metrics.update({f"{k}": v for k, v in sample_metrics.items()})
+
+                if split == "train":
+                    for k, v in step_metrics.items():
+                        self.metrics[f"{split}/{k}"].append(float(v))
                     if self.run:
                         self.run.log(
                             {
-                                **{f'{split}/{k}': float(v) 
-                                for (k, v) in step_metrics.items()},
-                                'step':total_step,
+                                **{
+                                    f"{split}/{k}": float(v)
+                                    for (k, v) in step_metrics.items()
+                                },
+                                "step": total_step,
                             }
                         )
                     if self.run and total_step % self.save_every == 0:
@@ -293,61 +316,47 @@ class Trainer:
 
 
 
-                for (k, v) in step_metrics.items():
-                    epoch_metrics[k].append(v)                
-            
-            for (k, v) in epoch_metrics.items():
-                self.metrics[f'{split}/{k}_epoch'].append(float(np.mean(v)))
+                for k, v in step_metrics.items():
+                    epoch_metrics[k].append(v)
+
+            for k, v in epoch_metrics.items():
+                self.metrics[f"{split}/{k}_epoch"].append(float(np.mean(v)))
                 if self.run:
                     self.run.log(
                         {
-                            **{ 
-                                f'{split}/{k}_epoch': float(np.mean(v)) 
+                            **{
+                                f"{split}/{k}_epoch": float(np.mean(v))
                                 for (k, v) in epoch_metrics.items()
                             },
-                            'epoch': epoch
+                            "epoch": epoch,
                         },
                     )
-                
+
     def train(self) -> Run:
         print("Training...")
         for epoch in tqdm(range(self.num_epochs), position=0):
             self.epoch(epoch=epoch)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     # def run_sample(self, rng_seq, state, batch, step):
     #     keys = jax.random.split(next(rng_seq), min(9, len(batch)))
 
     #     if hasattr(self, 'sample_params'):
     #         params_ = {**state.params, **self.sample_params}
-    #     else: 
+    #     else:
     #         params_ = state.params
 
     #     batched = inner_stack(batch[:9])
 
     #     start = time.time()
     #     samples, trajectories = jax.vmap(
-    #         self.sample_model, 
+    #         self.sample_model,
     #         in_axes=(None, 0, 0)
     #     )(params_, keys, batched)
     #     end = time.time()
     #     samples = inner_split(samples)
-    
+
     #     sample_metrics = {}
-    #     if step != 0: 
+    #     if step != 0:
     #         sample_metrics.update({'sample_time': end - start})
 
     #     if self.plot_mode == 'samples':

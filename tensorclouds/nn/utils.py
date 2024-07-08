@@ -23,6 +23,7 @@ def l2_norm(tree):
     leaves, _ = tree_flatten(tree)
     return jnp.sqrt(sum(jnp.vdot(x, x) for x in leaves))
 
+
 def clip_grads(grad_tree, max_norm):
     """Clip gradients stored as a pytree of arrays to maximum norm `max_norm`."""
     norm = l2_norm(grad_tree)
@@ -43,15 +44,17 @@ def inner_split(pytree):
     splits = list(zip(*splits))
     return [jax.tree_util.tree_unflatten(defs, split) for split in splits]
 
+
 from ..tensorcloud import TensorCloud
+
 
 @chex.dataclass
 class ModelOutput:
     datum: ProteinDatum
     encoder_internals: List[TensorCloud]
     decoder_internals: List[TensorCloud]
-    atom_perm_loss: jnp.ndarray
-    diff_loss: List[jnp.ndarray]
+    atom_perm_loss: jax.Array
+    diff_loss: List[jax.Array]
 
 
 def rescale_irreps(irreps: e3nn.Irreps, rescale: float, chunk_factor: int = 0):
@@ -116,15 +119,16 @@ def down_conv_seq_len(size: int, kernel: int, stride: int, mode: str) -> int:
     raise ValueError(f"Unknown mode: {mode}")
 
 
-def safe_norm(vector: jnp.ndarray, axis: int = -1) -> jnp.ndarray:
+def safe_norm(vector: jax.Array, axis: int = -1) -> jax.Array:
     """safe_norm(x) = norm(x) if norm(x) != 0 else 1.0"""
     norms_sqr = jnp.sum(vector**2, axis=axis)
     norms = jnp.where(norms_sqr == 0.0, 1.0, norms_sqr) ** 0.5
     return norms
 
 
-def safe_normalize(vector: jnp.ndarray) -> jnp.ndarray:
+def safe_normalize(vector: jax.Array) -> jax.Array:
     return vector / safe_norm(vector)[..., None]
+
 
 import os
 import pickle
@@ -137,6 +141,6 @@ class EmbeddingsDataset(PreProcessedDataset):
 
     def __init__(self, path, transform=[]):
         self.path = path
-        with open(os.path.join(path, 'embeddings.pyd'), 'rb') as f:
+        with open(os.path.join(path, "embeddings.pyd"), "rb") as f:
             splits = pickle.load(f)
         super().__init__(splits, transform=transform)

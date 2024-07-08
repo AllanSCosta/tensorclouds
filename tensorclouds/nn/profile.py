@@ -6,7 +6,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from ..tensorcloud import TensorCloud 
+from ..tensorcloud import TensorCloud
+
 
 def breakpoint_if_nonfinite(x):
     is_finite = jnp.isfinite(x).all()
@@ -167,10 +168,7 @@ def profile(message: str, tree_array: Any, tree_mask: Optional[Any] = None):
     amplitude = (
         jnp.mean(
             jnp.array(
-                [
-                    jnp.where(m, e**2, 0.0).sum() / m.sum()
-                    for e, m in zip(leaves, mask)
-                ]
+                [jnp.where(m, e**2, 0.0).sum() / m.sum() for e, m in zip(leaves, mask)]
             )
         )
         ** 0.5

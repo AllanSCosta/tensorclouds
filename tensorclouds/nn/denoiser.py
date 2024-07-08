@@ -9,7 +9,7 @@ from tensorclouds.nn.utils import safe_normalize
 
 from .spatial_convolution import CompleteSpatialConvolution, kNNSpatialConvolution
 from .self_interaction import SelfInteraction
-from ..tensorcloud import TensorCloud 
+from ..tensorcloud import TensorCloud
 
 
 from moleculib.assembly.datum import AssemblyDatum
@@ -50,11 +50,11 @@ class OnehotTimeEmbed(nn.Module):
         mask = state.mask
         t_emb = e3nn.soft_one_hot_linspace(
             t.astype(jnp.float32),
-            start=self.time_range[0], 
-            end=self.time_range[1], 
-            number=self.timesteps, 
-            basis="cosine", 
-            cutoff=True
+            start=self.time_range[0],
+            end=self.time_range[1],
+            number=self.timesteps,
+            basis="cosine",
+            cutoff=True,
         )
 
         t_emb = t_emb * mask[..., None]
@@ -84,7 +84,9 @@ class Denoiser(nn.Module):
     @nn.compact
     def __call__(self, x, t=None, cond=None):
         if cond is not None:
-            x = x.replace(irreps_array=e3nn.concatenate([x.irreps_array, cond], axis=-1).regroup())
+            x = x.replace(
+                irreps_array=e3nn.concatenate([x.irreps_array, cond], axis=-1).regroup()
+            )
 
         # first mix
         x = SelfInteraction(
@@ -119,10 +121,10 @@ class Denoiser(nn.Module):
             norm_last=True,
         )(x)
 
-        states = [ x.irreps_array ]
+        states = [x.irreps_array]
 
         for irreps in self.layers[:-1]:
-            res = x # residual connection
+            res = x  # residual connection
 
             x = SelfInteraction(
                 [irreps],
@@ -138,7 +140,7 @@ class Denoiser(nn.Module):
                     k_seq=self.k_seq,
                     radial_cut=self.radial_cut,
                     radial_bins=32,
-                    radial_basis='gaussian',
+                    radial_basis="gaussian",
                     move=self.move,
                 )(x)
             else:
@@ -151,14 +153,13 @@ class Denoiser(nn.Module):
                 )(x)
 
             x = x.replace(
-                irreps_array = e3nn.concatenate(
+                irreps_array=e3nn.concatenate(
                     (res.irreps_array, x.irreps_array), axis=-1
-                ).regroup() * x.mask[..., None]
+                ).regroup()
+                * x.mask[..., None]
             )
 
-            x = x.replace(
-                irreps_array=EquivariantLayerNorm()(x.irreps_array)
-            )
+            x = x.replace(irreps_array=EquivariantLayerNorm()(x.irreps_array))
             states.append(x.irreps_array)
 
         x = x.replace(
@@ -166,14 +167,14 @@ class Denoiser(nn.Module):
                 e3nn.concatenate(states, axis=-1).regroup()
             )
         )
-        
+
         x = SelfInteraction(
             [self.layers[-2]],
             norm=True,
             norm_last=True,
             full_square=False,
         )(x)
-        
+
         tc_out = SelfInteraction(
             [self.layers[-1]],
             norm=False,
@@ -182,16 +183,19 @@ class Denoiser(nn.Module):
         )(x)
 
         if not self.move:
-            coord_out = SelfInteraction(
-                ['1x0e + 1x1e'],
-                full_square=True,
-                norm=False,
-                norm_last=False,
-            )(x).irreps_array.filter('1e').array
+            coord_out = (
+                SelfInteraction(
+                    ["1x0e + 1x1e"],
+                    full_square=True,
+                    norm=False,
+                    norm_last=False,
+                )(x)
+                .irreps_array.filter("1e")
+                .array
+            )
             tc_out = tc_out.replace(coord=coord_out)
 
         return tc_out
-
 
 
 class TwoTrackDenoiser(nn.Module):
@@ -201,20 +205,22 @@ class TwoTrackDenoiser(nn.Module):
 
     @nn.compact
     def __call__(
-        self, x, t, cond=None,
+        self,
+        x,
+        t,
+        cond=None,
     ):
         pred_feature = self.feature_net(x, t, cond=cond).irreps_array
         pred_coord = self.coord_net(x, t, cond=cond).coord
 
         feature_mask = e3nn.IrrepsArray(
-            f'{x.irreps_array.irreps.num_irreps}x0e', x.mask_irreps_array
+            f"{x.irreps_array.irreps.num_irreps}x0e", x.mask_irreps_array
         )
         coord_mask = x.mask_coord[..., None]
         return x.replace(
             irreps_array=feature_mask * pred_feature,
             coord=coord_mask * pred_coord,
         )
-
 
 
 class FourTrackDenoiser(nn.Module):
@@ -227,7 +233,10 @@ class FourTrackDenoiser(nn.Module):
 
     @nn.compact
     def __call__(
-        self, x, t, cond=None,
+        self,
+        x,
+        t,
+        cond=None,
     ):
         pred_feature1 = self.feature_net1(x, t, cond=cond).irreps_array
         pred_feature2 = self.feature_net2(x, t, cond=cond).irreps_array
@@ -236,7 +245,7 @@ class FourTrackDenoiser(nn.Module):
         pred_coord2 = self.coord_net2(x, t, cond=cond).coord
 
         feature_mask = e3nn.IrrepsArray(
-            f'{x.irreps_array.irreps.num_irreps}x0e', x.mask_irreps_array
+            f"{x.irreps_array.irreps.num_irreps}x0e", x.mask_irreps_array
         )
         coord_mask = x.mask_coord[..., None]
 

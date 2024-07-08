@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from model.base.sequence_convolution import convolution_indices
 from model.base.utils import down_conv_seq_len, up_conv_seq_len
 import e3nn_jax as e3nn
-from ..tensorcloud import TensorCloud 
+from ..tensorcloud import TensorCloud
 
 from einops import repeat
 import jax
@@ -58,13 +58,11 @@ class Upsample(nn.Module):
         coord_num_neigh, new_mask_coord = _num_neighbors(coord_dst)
         irreps_array_num_neigh, new_mask_irreps_array = _num_neighbors(irreps_array_dst)
 
-        new_coord = (
-            e3nn.scatter_sum(
-                repeat(state.coord, "i d -> i k d", k=k),
-                dst=coord_dst,
-                output_size=reverse_seq_len,
-            ) / (coord_num_neigh[:, None] + 1e-6)
-        )
+        new_coord = e3nn.scatter_sum(
+            repeat(state.coord, "i d -> i k d", k=k),
+            dst=coord_dst,
+            output_size=reverse_seq_len,
+        ) / (coord_num_neigh[:, None] + 1e-6)
         assert new_coord.shape == (reverse_seq_len, 3)
 
         irreps_array = e3nn.flax.Linear(self.irreps_out)(state.irreps_array)

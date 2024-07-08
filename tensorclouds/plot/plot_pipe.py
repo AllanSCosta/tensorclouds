@@ -9,4 +9,3 @@ class PlotPipe:
 
     def __call__(self, run, output, batch, split=None):
         [plot(run, output, batch, split) for plot in self.plot_list]
-

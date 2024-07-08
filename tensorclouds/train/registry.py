@@ -4,6 +4,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
+
 # import git
 
 from .platform import Platform
@@ -36,22 +37,19 @@ class Registry:
         self.source = Path(source)
 
     def new_platform(
-            self, 
-            cfg, 
-            tags=None,
-            copy_repo=False,
-        ) -> Platform:
+        self,
+        cfg,
+        tags=None,
+        copy_repo=False,
+    ) -> Platform:
         yml_cfg = hydra_zen.to_yaml(cfg)
         cfg_dict = yaml.safe_load(yml_cfg)
         run = wandb.init(
-            project=self.project,
-            dir=self.path,
-            config=cfg_dict,
-            tags=tags
+            project=self.project, dir=self.path, config=cfg_dict, tags=tags
         )
 
         name = run.name
-        platform_dir = self.path / name 
+        platform_dir = self.path / name
         os.makedirs(str(platform_dir), exist_ok=True)
         print(f"Copying Source Code to Platform -> {platform_dir}")
 
@@ -60,7 +58,11 @@ class Registry:
             ignore_list = [
                 file
                 for file in files
-                if (file.startswith(".") or file in ("__pycache__",) or dir[dir.rfind('/') + 1:] in ('notebooks', 'wandb'))
+                if (
+                    file.startswith(".")
+                    or file in ("__pycache__",)
+                    or dir[dir.rfind("/") + 1 :] in ("notebooks", "wandb")
+                )
             ]
             return ignore_list
 
@@ -91,7 +93,7 @@ class Registry:
         #     raise ValueError(f"Platform {name} is missing code directory"
         platform_path = self.path / name
 
-        run = None # Run(repo=self.repo, run_hash=hash, read_only=read_only)
+        run = None  # Run(repo=self.repo, run_hash=hash, read_only=read_only)
         return Platform(hash, platform_path, run)
 
     def get_git_info(self):
