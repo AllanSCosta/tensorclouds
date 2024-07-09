@@ -116,13 +116,8 @@ class Trainer:
                 batch_size=self.batch_size,
                 num_workers=self.num_workers,
                 collate_fn=lambda x: x,
-<<<<<<< HEAD
                 shuffle=True,
             ) for split in self.dataset.splits
-=======
-            )
-            for split in self.dataset.splits
->>>>>>> 7936486316ec09da44e78a30886cf6b4885f6ba6
         }
 
         if self.batch_size == None:
@@ -159,17 +154,8 @@ class Trainer:
 
     def init(self):
         print("Initializing Model...")
-<<<<<<< HEAD
         init_datum = next(iter(self.loaders['train']))[0]
         init_datum = [init_datum.to_pytree()] if type(init_datum) != list else [d.to_pytree() for d in init_datum] 
-=======
-        init_datum = self.dataset.splits["train"][0]
-        init_datum = (
-            [init_datum.to_pytree()]
-            if type(init_datum) != list
-            else [d.to_pytree() for d in init_datum]
-        )
->>>>>>> 7936486316ec09da44e78a30886cf6b4885f6ba6
 
         self.rng_seq = jax.random.key(self.seed)
         self.rng_seq, init_rng = jax.random.split(self.rng_seq)
