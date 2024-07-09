@@ -3,7 +3,7 @@ import os
 import pickle
 import shutil
 import time
-import haiku as hk
+from flax import linen as nn
 from typing import Callable, NamedTuple, Tuple, Dict, Any
 
 import jax
@@ -64,7 +64,7 @@ class Trainer:
 
     def __init__(
         self,
-        model: hk.Module,
+        model: nn.Module,
         learning_rate,
         losses,
         seed,

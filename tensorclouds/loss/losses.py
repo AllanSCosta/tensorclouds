@@ -193,6 +193,33 @@ class TensorCloudMatchingLoss(LossFunction):
         return model_output, features_loss + coord_loss, metrics
 
 
+class TensorCloudFlowLoss(LossFunction):
+
+    def _call(self, _, model_output: ModelOutput, __: ProteinDatum):
+        pred, target = model_output.prediction, model_output.target
+
+        def stochastic_interpolant_loss(pred, target):
+            feature_dot1, coord_dot1 = pred.dot(pred)
+            feature_dot2, coord_dot2 = target.dot(pred)
+
+            feature_loss = 0.5 * feature_dot1 - feature_dot2
+            coord_loss = 0.5 * coord_dot1 - coord_dot2
+
+            feature_loss = feature_loss.mean()
+            coord_loss = 1 * coord_loss.mean()
+            return feature_loss, coord_loss
+
+        feature_loss, coord_loss = stochastic_interpolant_loss(pred, target)
+        return (
+            model_output,
+            feature_loss.mean() + coord_loss.mean(),
+            {
+                "feature_loss": feature_loss,
+                "coord_loss": coord_loss,
+            },
+        )
+
+
 class VectorCloudMatchingLoss(LossFunction):
 
     def _call(
