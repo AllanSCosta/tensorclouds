@@ -133,9 +133,8 @@ def safe_normalize(vector: jax.Array) -> jax.Array:
 import os
 import pickle
 
-from moleculib.assembly.datum import AssemblyDatum
-from moleculib.abstract.dataset import PreProcessedDataset
 
+from moleculib.abstract.dataset import PreProcessedDataset
 
 class EmbeddingsDataset(PreProcessedDataset):
 

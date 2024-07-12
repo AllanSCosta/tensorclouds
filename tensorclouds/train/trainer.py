@@ -8,6 +8,7 @@ from typing import Callable, NamedTuple, Tuple, Dict, Any
 
 import jax
 from jax.tree_util import tree_reduce
+import jax.numpy as jnp
 import numpy as np
 import optax
 import functools
@@ -38,9 +39,6 @@ else:
     from tqdm import tqdm
 
 
-import jax.numpy as jnp
-from flax.training import orbax_utils
-import orbax
 
 
 class TrainState(NamedTuple):
@@ -48,11 +46,10 @@ class TrainState(NamedTuple):
     opt_state: Any
 
 
-import jax.numpy as jnp
 
 
 def tree_stack(trees):
-    return jax.tree_util.tree_map(lambda *v: jnp.stack(v), *trees)
+    return jax.tree_util.tree_map(lambda *v: np.stack(v) if type(v[0]) != str else None, *trees)
 
 
 def tree_unstack(tree):

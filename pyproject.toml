@@ -16,6 +16,7 @@ dependencies = [
     "ordered_set",
     "flax",
     "einops",
+    "hydra-zen",
 ]
 classifiers = [
     "Intended Audience :: Developers",
