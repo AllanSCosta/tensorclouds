@@ -40,6 +40,7 @@ class TensorCloud:
 
     @property
     def mask(self) -> jnp.ndarray:
+        print(f' in tensor cloud.py. mask func.self.mask_irreps_array & self.mask_coord, {self.mask_irreps_array}, {self.mask_coord}')
         return self.mask_irreps_array & self.mask_coord
     
     def replace(self, **kwargs):
@@ -142,9 +143,21 @@ class TensorCloud:
         return f"TensorCloud(irreps={self.irreps}, shape={self.irreps_array.shape})"
     
     def __add__(self, other: 'TensorCloud') -> 'TensorCloud':
+        # print(f' new, in tensor cloud add method. self.mask_coord: {self.mask_coord},other.mask_coord:{other.mask_coord} ')
+        # print(f' in tensor cloud add method. self.mask_f: {self.mask_irreps_array},other.mask f:{other.mask_irreps_array} ')
+        #TODO: other.mask features is none FIX.
+        #####NOT A GOOD FIX:
+        mask_irreps_array = self.mask_irreps_array
+        other_mask_irreps_array = other.mask_irreps_array
+        if mask_irreps_array is not None and other_mask_irreps_array is not None:
+            mask_irreps_array = mask_irreps_array & other_mask_irreps_array
+        elif mask_irreps_array is None:
+            mask_irreps_array = other_mask_irreps_array
+        elif other_mask_irreps_array is None:
+            mask_irreps_array = mask_irreps_array
         return TensorCloud(
             irreps_array=self.irreps_array + other.irreps_array,
-            mask_irreps_array=self.mask_irreps_array & other.mask_irreps_array,
+            mask_irreps_array= mask_irreps_array, # NOTE: was : self.mask_irreps_array & other.mask_irreps_array,
             coord=self.coord + other.coord,
             mask_coord=self.mask_coord & other.mask_coord
         )

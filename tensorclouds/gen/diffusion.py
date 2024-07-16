@@ -8,6 +8,8 @@ from tensorclouds.random.normal import NormalDistribution
 from ..tensorcloud import TensorCloud
 
 from typing import List
+from ..utils import align_with_rotation
+
 
 
 
@@ -132,21 +134,28 @@ class TensorCloudDiffuser(hk.Module):
     ):
         pred_feature = self.feature_net(x, t, cond=cond)
         pred_coord = self.coord_net(x, t, cond=cond)
+        
+        # TODO : Add centralization??
+        
         return x.replace(
-            irreps_array=pred_feature.irreps_array,
-            coord=pred_coord.coord,
+            irreps_array=pred_feature.irreps_array * x.mask_irreps_array[:, None],  # TODO dana multiply by x.mask
+            coord=pred_coord.coord * x.mask_coord[:, None],  # TODO dana multiply by x.mask
         )
     
     def sample(
         self, 
         cond: e3nn.IrrepsArray = None,
+        mask_coord= None, 
+        mask_features = None
     ):
         
         def update_one_step(xt: TensorCloud, t: float) -> TensorCloud:      
             z = self.normal.sample(
                 hk.next_rng_key(), 
-                leading_shape=self.leading_shape
-            )
+                leading_shape=self.leading_shape,
+                mask_coord=mask_coord,
+                mask_features=mask_features)
+
             
             ϵ̂ = self.make_prediction(xt, t, cond=cond)
 
@@ -158,12 +167,19 @@ class TensorCloudDiffuser(hk.Module):
             
             next_xt = (1/sqrt(αt)) * (xt + (-((1 - αt) / sqrt(1 - ᾱt))) * ϵ̂).centralize() + (t != 0) * σt * z
 
+            next_xt = next_xt.centralize() #NOTE: Added by dana
+            
+            print(f'in diffusion next_xt: {next_xt}')
+            
             return next_xt, next_xt
 
         zT = self.normal.sample(
             hk.next_rng_key(), 
-            leading_shape=self.leading_shape
+            leading_shape=self.leading_shape,
+            mask_coord=mask_coord, #NOTE: dana added these masks
+            mask_features=mask_features
         )
+        print(f'in diffusion zt: {zT}')
         return hk.scan(
             update_one_step,
             zT,
@@ -171,11 +187,17 @@ class TensorCloudDiffuser(hk.Module):
         )
 
     def q_sample(self, x0, t: int):
+        # x0 is tensor cloud
+        print(f' new in q sample. x0.mask_irreps_array is shape {x0.mask_irreps_array.shape} and {x0.mask_irreps_array} ')
         z = self.normal.sample(
             hk.next_rng_key(),
             leading_shape=self.leading_shape,
-            mask=x0.mask_irreps_array,
+            mask_coord=x0.mask_irreps_array, #TODO: add mask
         )
+        z = z.centralize()
+        
+        z, x0 = align_with_rotation(z, x0)  # NOTE: Added by dana
+         
         return (
             self.sqrt_alphas_cumprod[t] * x0
             + self.sqrt_one_minus_alphas_cumprod[t] * z
@@ -190,7 +212,7 @@ class TensorCloudDiffuser(hk.Module):
         t = jax.random.randint(hk.next_rng_key(), (), 0, self.num_timesteps)
         
         x0 = x0.centralize()
-        xt, z = self.q_sample(x0, t)
+        xt, z = self.q_sample(x0, t) #new#CCHECK
         ẑ = self.make_prediction(xt, t, cond=cond)
 
         return ModelPrediction(
