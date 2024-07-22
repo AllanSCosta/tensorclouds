@@ -83,18 +83,23 @@ class Denoiser(nn.Module):
 
     @nn.compact
     def __call__(self, x, t=None, cond=None):
+        
+        # concatenate cond 
         if cond is not None:
             x = x.replace(
                 irreps_array=e3nn.concatenate([x.irreps_array, cond], axis=-1).regroup()
             )
-
-        # first mix
+        
+        # first mix with full square
         x = SelfInteraction(
             [self.layers[0]],
             full_square=True,
             norm_last=False,
+            
         )(x)
 
+
+        # concatenate position
         if self.pos_encoding:
             pos = nn.Embed(
                 num_embeddings=x.irreps_array.shape[0], 
@@ -111,10 +116,11 @@ class Denoiser(nn.Module):
                 ), axis=-1).regroup() * x.mask_coord[..., None]
             )
 
+        # concatenate time
         if t is not None:
             x = OnehotTimeEmbed(self.timesteps, self.time_range)(x, t)
 
-        # second mix
+        # second mix without full square
         x = SelfInteraction(
             [self.layers[0]],
             full_square=False,

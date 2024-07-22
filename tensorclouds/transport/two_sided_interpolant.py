@@ -141,3 +141,51 @@ class TensorCloudStepInterpolant(nn.Module):
             NoisePrediction(prediction=noise_pred, target=z),
             DriftPrediction(prediction=drift_pred, target=drift),
         )
+
+
+    # NOTE(Allan): experimental
+    # def sample(
+    #     self,
+    #     x0=None,
+    #     cond=None,
+    #     num_steps: int = 1000,
+    # ) -> Tuple[TensorCloud, TensorCloud]:
+    #     dt = 1.0 / num_steps
+        
+    #     init_key, bm_key = jax.random.split(self.make_rng(), 2)        
+    #     # control = diffrax.VirtualBrownianTree(t0=0, t1=1, tol=dt / 2, shape=(self.noise_size,), key=bm_key)
+
+
+    #     class TensorCloudBrownian(diffrax.AbstractBrownianPath):
+
+    #         def evaluate(self, t0: Union[float, int], t1: Union[float, int] = None):
+
+    #     def diffusion_term(t, x):
+    #         z = NormalDistribution(
+    #             irreps_in=x.irreps,
+    #             irreps_mean=e3nn.zeros(x.irreps),
+    #             irreps_scale=self.var_features,
+    #             coords_mean=jnp.zeros(3),
+    #             coords_scale=self.var_coords,
+    #         ).sample(
+    #             self.make_rng(),
+    #             leading_shape=self.leading_shape,
+    #             mask_coord=z.mask_coord,
+    #             mask_features=z.mask_irreps_array,
+    #         )
+    #         eta_hat = ((1 / self.gamma(t))) * self.network(x, t, cond=cond)[1]
+    #         eta = jnp.sqrt(2) * jnp.sqrt(dt) * z
+    #         return (t < 0.9) * (t > 0.1) * (eta - eta_hat)
+
+    #     vf = diffrax.ODETerm(lambda t, x: self.network(x, t, cond=cond)[0])
+    #     cvf = diffrax.ControlTerm(lambda t, x: diffusion_term(t, x))  
+
+    #     terms = diffrax.MultiTerm(vf, cvf)
+        
+    #     # ReversibleHeun is a cheap choice of SDE solver. We could also use Euler etc.
+    #     solver = diffrax.ReversibleHeun()
+        
+    #     saveat = diffrax.SaveAt(ts=jnp.arange(0, 1, dt))
+    #     sol = diffrax.diffeqsolve(terms, solver, 0, 1, dt, x0, saveat=saveat)
+    
+    #     return jax.vmap(self.readout)(sol.ys)

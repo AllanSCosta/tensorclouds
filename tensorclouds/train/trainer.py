@@ -38,6 +38,7 @@ if in_notebook():
 else:
     from tqdm import tqdm
 
+import wandb
 
 
 
@@ -71,6 +72,7 @@ class Trainer:
         num_workers,
         save_every,
         validate_every,
+        max_grad: float = 100.0,
         save_model: Callable = None,
         run: Run = None,
         single_datum: bool = False,
@@ -106,7 +108,7 @@ class Trainer:
         self.run = run
 
         self.name = self.run.name if run else "trainer"
-        self.max_grad = 1000.0
+        self.max_grad = 100.0
         self.loaders = {
             split: DataLoader(
                 self.dataset.splits[split],
@@ -176,6 +178,7 @@ class Trainer:
         print(f"Model has {num_params:.3e} parameters")
         if self.run:
             self.run.summary["NUM_PARAMS"] = num_params
+            self.run.log({'num_params': num_params})
 
     @functools.partial(jax.jit, static_argnums=(0,))
     def loss(self, params, keys, batch, step):
@@ -290,12 +293,15 @@ class Trainer:
                             }
                         )
                     if self.run and total_step % self.save_every == 0:
+
                         checkpoint_path = self.run.dir + '/checkpoints'
                         os.makedirs(checkpoint_path, exist_ok=True)
                         self.checkpoint_index = 0 # Currently no rule for checkpointing
-                        with open(checkpoint_path + f"/params_{self.checkpoint_index}.npy", "wb") as file:
+
+                        with open(checkpoint_path + f"/latest_params.npy", "wb") as file:
                             checkpoint = { 'params': jax.device_get(self.train_state.params) }
                             pickle.dump(checkpoint, file)
+                        wandb.save('checkpoints/latest_params.npy')
 
 
 
