@@ -123,10 +123,10 @@ class TensorCloudStepInterpolant(nn.Module):
         x1: TensorCloud,
         is_training=False,
         cond: TensorCloud = None,
-        eps: float = 1e-1,
+        eps: float = 1e-4,
     ):
         # Sample time.
-        t = jax.random.uniform(self.make_rng())
+        t = jax.random.uniform(self.make_rng(), minval=0.0 + eps, maxval=1.0 - eps)
         x0 = x0.centralize()
         x1 = x1.centralize()
 
