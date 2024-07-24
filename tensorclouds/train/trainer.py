@@ -45,9 +45,13 @@ import wandb
 class TrainState(NamedTuple):
     params: Any
     opt_state: Any
+    step: int
 
 
 
+def track(run, dict_):
+    for key, val in dict_.items():
+        run.track(val, key)
 
 def tree_stack(trees):
     return jax.tree_util.tree_map(lambda *v: np.stack(v) if type(v[0]) != str else None, *trees)
@@ -89,6 +93,7 @@ class Trainer:
         sample_plot: Callable = None,
         sample_batch_size=None,
         sample_metrics=None,
+        checkpoint_every: int = 10000
     ):
         self.model = model
         # torch.multiprocessing.set_start_method('spawn')
@@ -106,6 +111,7 @@ class Trainer:
         print(f"Batch Size: {self.batch_size}")
         self.save_model = save_model
         self.run = run
+        self.checkpoint_every = checkpoint_every
 
         self.name = self.run.name if run else "trainer"
         self.max_grad = 100.0
@@ -149,9 +155,7 @@ class Trainer:
         self.sample_every = sample_every
         self.metrics = defaultdict(list)
 
-        self.init()
-
-    def init(self):
+    def init(self, source=None):
         print("Initializing Model...")
         init_datum = next(iter(self.loaders['train']))[0]
         init_datum = [init_datum.to_pytree()] if type(init_datum) != list else [d.to_pytree() for d in init_datum] 
@@ -166,19 +170,23 @@ class Trainer:
             return TrainState(
                 params,
                 opt_state,
+                0
             )
 
-        clock = time.time()
-        self.train_state = _init(init_rng, *init_datum)
-        print("Init Time:", time.time() - clock)
+        if source == None:
+            clock = time.time()
+            self.train_state = _init(init_rng, *init_datum)
+            print("Init Time:", time.time() - clock)
+        else:
+            self.train_state = source
+
         num_params = sum(
             x.size for x in jax.tree_util.tree_leaves(self.train_state.params)
         )
 
         print(f"Model has {num_params:.3e} parameters")
         if self.run:
-            self.run.summary["NUM_PARAMS"] = num_params
-            self.run.log({'num_params': num_params})
+            track(self.run, {'num_params': num_params})
 
     @functools.partial(jax.jit, static_argnums=(0,))
     def loss(self, params, keys, batch, step):
@@ -198,11 +206,11 @@ class Trainer:
         return loss, (output, loss, metrics)
 
     @functools.partial(jax.jit, static_argnums=(0,))
-    def update(self, rng, state, batch, step):
+    def update(self, rng, state, batch):
         grad, (output, loss, metrics) = jax.grad(
             lambda params, rng, batch, step: self.loss(params, rng, batch, step),
             has_aux=True,
-        )(state.params, rng, batch, step)
+        )(state.params, rng, batch, state.step)
 
         # reduce gradients & metrics
         loss = loss.mean()
@@ -215,7 +223,7 @@ class Trainer:
         updates, opt_state = self.optimizer.update(grad, state.opt_state, state.params)
         params = optax.apply_updates(state.params, updates)
 
-        return output, TrainState(params, opt_state), metrics
+        return output, TrainState(params, opt_state, state.step + 1), metrics
 
     def epoch(self, epoch) -> Tuple[Dict, Dict]:
 
@@ -238,16 +246,15 @@ class Trainer:
                 if len(data) != self.batch_size:
                     continue         
                        
+                total_step = self.train_state.step
                 batch = tree_stack([[d.to_pytree()] if type(d)!= list else [d_.to_pytree() for d_ in d] for d in data])
-
-                total_step = epoch * len(loader) + step
 
                 self.rng_seq, subkey = jax.random.split(self.rng_seq)
                 keys = jax.random.split(subkey, len(data))
 
                 batched = batch
                 output, new_train_state, step_metrics = self.update(
-                    keys, self.train_state, batched, total_step
+                    keys, self.train_state, batched
                 )
                 output = inner_split(output)
                 pbar.set_postfix({"loss": f"{step_metrics['loss']:.3e}"})
@@ -283,7 +290,8 @@ class Trainer:
                     for k, v in step_metrics.items():
                         self.metrics[f"{split}/{k}"].append(float(v))
                     if self.run:
-                        self.run.log(
+                        track(
+                            self.run,
                             {
                                 **{
                                     f"{split}/{k}": float(v)
@@ -292,18 +300,18 @@ class Trainer:
                                 "step": total_step,
                             }
                         )
-                    if self.run and total_step % self.save_every == 0:
 
-                        checkpoint_path = self.run.dir + '/checkpoints'
+                    if self.run:
+                        checkpoint_path = self.run['hparams']['env']['platform_path'] + self.run.hash + '/checkpoints'
                         os.makedirs(checkpoint_path, exist_ok=True)
-                        self.checkpoint_index = 0 # Currently no rule for checkpointing
 
-                        with open(checkpoint_path + f"/latest_params.npy", "wb") as file:
-                            checkpoint = { 'params': jax.device_get(self.train_state.params) }
-                            pickle.dump(checkpoint, file)
-                        wandb.save('checkpoints/latest_params.npy')
-
-
+                        if total_step % self.save_every == 0:
+                            with open(checkpoint_path + f"/latest_state.npy", "wb") as file:
+                                pickle.dump(jax.device_get(self.train_state), file)
+                            
+                        if total_step % self.checkpoint_every == 0:
+                            with open(checkpoint_path + f"/state_{total_step}.npy", "wb") as file:
+                                pickle.dump(jax.device_get(self.train_state), file)
 
                 for k, v in step_metrics.items():
                     epoch_metrics[k].append(v)
@@ -311,7 +319,8 @@ class Trainer:
             for k, v in epoch_metrics.items():
                 self.metrics[f"{split}/{k}_epoch"].append(float(np.mean(v)))
                 if self.run:
-                    self.run.log(
+                    track(
+                        self.run,
                         {
                             **{
                                 f"{split}/{k}_epoch": float(np.mean(v))
