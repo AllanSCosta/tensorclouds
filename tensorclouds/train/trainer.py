@@ -6,6 +6,7 @@ import time
 from flax import linen as nn
 from typing import Callable, NamedTuple, Tuple, Dict, Any
 
+import random
 import jax
 from jax.tree_util import tree_reduce
 import jax.numpy as jnp
@@ -133,6 +134,12 @@ class Trainer:
             print("[!!WARNING!!] using single datum")
             sample_batch = next(iter(self.loaders["train"]))
             sample_datum = sample_batch[0]
+            # while len(sample_datum.nuc_token[sample_datum.nuc_mask]) < 100:
+            #     # Randomly select a new sample datum from the batch
+            #     sample_datum = random.choice(sample_batch)
+            with open('single_jul22.pkl', 'wb') as file:
+                pickle.dump(sample_datum, file)
+            print("sample_datum has been saved as a pickle file.")
             sample_batch = [sample_datum] * self.batch_size
             self.loaders = {"train": [sample_batch] * 1000}
 
