@@ -1,4 +1,4 @@
-from typing import Callable, List, Tuple
+from typing import Callable, List, Tuple, Optional
 
 from einops import rearrange, repeat
 
@@ -29,7 +29,12 @@ class CompleteSpatialConvolution(nn.Module):
     move: bool = True
 
     @nn.compact
-    def __call__(self, state: TensorCloud) -> TensorCloud:
+    def __call__(self, state: TensorCloud, cond_2d: Optional[jnp.ndarray] = None) -> TensorCloud: #cond_2d: jnp.ndarray
+        # conv_2d shape is [N, N] and its the contact map
+        if cond_2d is not None:
+            cond_2d_embedded = nn.Embed(num_embeddings=2, features=32)(cond_2d)
+        
+        
         seq_len = state.irreps_array.shape[0]
         assert state.mask.shape == (seq_len,)
         assert state.coord.shape == (seq_len, 3)
@@ -80,7 +85,7 @@ class CompleteSpatialConvolution(nn.Module):
             # messages_i,
             messages_j,
             ang_embed, 
-        ], axis=-1).regroup()
+        ], axis=-1).regroup() #becomes dimension 33 because of this concat  thats adding the ang embed
 
         # Radial part:
         rad_embed = (
@@ -111,7 +116,30 @@ class CompleteSpatialConvolution(nn.Module):
             relative_seq_pos
         )
 
-        rad_embed = e3nn.concatenate([relative_seq_pos, rad_embed, messages.filter('0e')], axis=-1).regroup()
+        # rad_embed has [N, N, H]
+        
+        # jax.debug.breakpoint()
+        # jax.debug.print("{}",cond_2d_embedded.shape)
+        # jax.debug.print("{}",messages.filter('0e').shape)
+        # jax.debug.print("{}",rad_embed.shape)
+        if cond_2d is not None:
+            rad_embed = e3nn.concatenate([
+                    relative_seq_pos,
+                    rad_embed,
+                    messages.filter('0e'),
+                    cond_2d_embedded,
+                ], 
+            axis=-1).regroup()
+
+        else:
+            rad_embed = e3nn.concatenate(
+                [
+                    relative_seq_pos,
+                    rad_embed,
+                    messages.filter('0e'),
+                ], 
+            axis=-1).regroup()
+        
         rad_embed = e3nn.flax.MultiLayerPerceptron(
             [self.radial_bins, messages.irreps.num_irreps],
             self.activation,

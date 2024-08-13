@@ -3,7 +3,7 @@ import math
 from flax import linen as nn
 import jax.numpy as jnp
 import e3nn_jax as e3nn
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from tensorclouds.nn.utils import safe_normalize
 
@@ -82,7 +82,7 @@ class Denoiser(nn.Module):
     pos_encoding: bool = False
 
     @nn.compact
-    def __call__(self, x, t=None, cond=None):
+    def __call__(self, x, t=None, cond=None, cond_2d=None): #: Optional[jnp.ndarray] = None
         if cond is not None:
             x = x.replace(
                 irreps_array=e3nn.concatenate([x.irreps_array, cond], axis=-1).regroup()
@@ -150,7 +150,7 @@ class Denoiser(nn.Module):
                     radial_bins=32,
                     k_seq=self.k_seq,
                     move=self.move,
-                )(x)
+                )(x, cond_2d = cond_2d)
 
             x = x.replace(
                 irreps_array=e3nn.concatenate(
@@ -209,9 +209,10 @@ class TwoTrackDenoiser(nn.Module):
         x,
         t,
         cond=None,
+        cond_2d = None, # Optional[jnp.ndarray]
     ):
-        pred_feature = self.feature_net(x, t, cond=cond).irreps_array
-        pred_coord = self.coord_net(x, t, cond=cond).coord
+        pred_feature = self.feature_net(x, t, cond=cond, cond_2d = cond_2d).irreps_array
+        pred_coord = self.coord_net(x, t, cond=cond, cond_2d = cond_2d).coord
 
         feature_mask = e3nn.IrrepsArray(
             f"{x.irreps_array.irreps.num_irreps}x0e", x.mask_irreps_array

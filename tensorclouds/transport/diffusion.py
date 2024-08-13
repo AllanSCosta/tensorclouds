@@ -7,7 +7,7 @@ import e3nn_jax as e3nn
 from tensorclouds.random.normal import NormalDistribution
 from ..tensorcloud import TensorCloud
 
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 
 # ==========================
@@ -119,7 +119,8 @@ class TensorCloudDiffuser(nn.Module):
         cond: e3nn.IrrepsArray = None,
         mask_coord=None,
         mask_features=None,
-    ):
+        cond_2d= None, #: Optional[jnp.ndarray] 
+    ): 
 
         def update_one_step(
             network: nn.Module, xt: TensorCloud, tk: Tuple
@@ -132,7 +133,8 @@ class TensorCloudDiffuser(nn.Module):
                 mask_features=xt.mask_irreps_array,
             )
 
-            ϵ̂ = network(xt, t, cond=cond)
+            #TODO: do i need cond_2d here? whats this epsilon
+            ϵ̂ = network(xt, t, cond=cond, cond_2d=cond_2d)
 
             αt = self.alphas[t]
             ᾱt = self.alphas_cumprod[t]
@@ -157,11 +159,13 @@ class TensorCloudDiffuser(nn.Module):
         ts = jnp.arange(0, self.timesteps)[::-1]
         ks = jax.random.split(self.make_rng(), self.timesteps)
 
+        #with nn.scan we apply the update one step iteratively 
+        # over the diffusion to gradually denoise
         return nn.scan(
             update_one_step,
             variable_broadcast="params",
             split_rngs={"params": True},
-        )(self.network, zT, [ts, ks])
+        )(self.network, zT , [ts, ks])
 
     def q_sample(self, x0, t: int):
         z = self.normal.sample(
@@ -175,13 +179,14 @@ class TensorCloudDiffuser(nn.Module):
         ), z
 
     def __call__(
-        self, x0: TensorCloud, cond: e3nn.IrrepsArray = None, is_training=False
+        self, x0: TensorCloud, cond: e3nn.IrrepsArray = None, 
+        cond_2d: Optional[jnp.ndarray] = None, is_training=False
     ):
         t = jax.random.randint(self.make_rng(), (), 0, self.timesteps)
         
         x0 = x0.centralize()
         xt, z = self.q_sample(x0, t)
-        ẑ = self.network(xt, t, cond=cond)
+        ẑ = self.network(xt, t, cond=cond, cond_2d=cond_2d)
 
         return ModelPrediction(
             prediction=ẑ, target=z, reweight=self.loss_weight[t][None]

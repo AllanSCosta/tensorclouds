@@ -50,6 +50,28 @@ class TrainState(NamedTuple):
 
 
 def tree_stack(trees):
+    # def stack_if_possible(*v):
+    #     if type(v[0]) != str:
+    #         shapes = [arr.shape for arr in v]
+    #         print("Shapes of arrays to be stacked:", shapes)
+    #         if all(shape == shapes[0] for shape in shapes):
+    #             return np.stack(v)
+    #         else:
+    #             raise ValueError(f"Array shapes do not match: {shapes}, {v}")
+    #     else:
+    #         print("tree stack is not working")
+    #         return None
+    # return jax.tree_util.tree_map(stack_if_possible, *trees)    
+    # total size
+    # len(trees)
+    
+    # check shapes
+    # [tree[0]['contact_map'].shape for tree in trees if tree[0]['contact_map'] is not None]
+    
+    # count non-nones
+    # len([tree[0]['contact_map'].shape for tree in trees if tree[0]['contact_map'] is not None])
+    
+    
     return jax.tree_util.tree_map(lambda *v: np.stack(v) if type(v[0]) != str else None, *trees)
 
 
