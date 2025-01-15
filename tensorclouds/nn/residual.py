@@ -35,7 +35,7 @@ class Residual(nn.Module):
             pad = (seq_len - new_seq_len) // 2
             state = jax.tree_util.tree_map(lambda x: x[pad:-pad], state)
 
-        if state.irreps_array.shape == new_state.irreps_array.shape:
+        if state.irreps_array.irreps == new_state.irreps_array.irreps:
             features = state.irreps_array + new_state.irreps_array
         else:
             features = e3nn.flax.Linear(new_state.irreps_array.irreps)(

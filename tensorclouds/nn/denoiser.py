@@ -35,6 +35,32 @@ class Denoiser(nn.Module):
             x = x.replace(
                 irreps_array=e3nn.concatenate([x.irreps_array, cond], axis=-1).regroup()
             )
+        
+        # first mix with full square
+        x = SelfInteraction(
+            [self.layers[0]],
+            full_square=True,
+            norm_last=False,
+            
+        )(x)
+
+
+        # concatenate position
+        if self.pos_encoding:
+            pos = nn.Embed(
+                num_embeddings=x.irreps_array.shape[0], 
+                features=x.irreps_array.filter('0e').shape[-1]
+            )(jnp.arange(x.irreps_array.shape[0]))
+
+            pos = e3nn.IrrepsArray(
+                f"{x.irreps_array.filter('0e').shape[-1]}x0e", pos
+            )
+
+            x = x.replace(
+                irreps_array=e3nn.concatenate((
+                    x.irreps_array, pos
+                ), axis=-1).regroup() * x.mask_coord[..., None]
+            )
 
         # concatenate time
         if t is not None:
