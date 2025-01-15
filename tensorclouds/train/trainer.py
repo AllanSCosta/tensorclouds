@@ -57,6 +57,9 @@ def tree_unstack(tree):
     return [treedef.unflatten(leaf) for leaf in zip(*leaves, strict=True)]
 
 
+def identity(x):
+    return x
+
 class Trainer:
 
     def __init__(
@@ -112,7 +115,7 @@ class Trainer:
                 self.dataset.splits[split],
                 batch_size=self.batch_size,
                 num_workers=self.num_workers,
-                collate_fn=lambda x: x,
+                collate_fn=identity,
                 shuffle=True,
             ) for split in self.dataset.splits
         }
