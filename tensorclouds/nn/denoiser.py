@@ -31,7 +31,7 @@ class Denoiser(nn.Module):
     def __call__(self, x, t=None, cond=None):
         
         # concatenate cond 
-        if cond != None:
+        if cond is not None:
             x = x.replace(
                 irreps_array=e3nn.concatenate([x.irreps_array, cond], axis=-1).regroup()
             )
@@ -39,9 +39,8 @@ class Denoiser(nn.Module):
         # first mix with full square
         x = SelfInteraction(
             [self.layers[0]],
-            full_square=True,
+            full_square=False,
             norm_last=False,
-            
         )(x)
 
 
