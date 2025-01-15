@@ -15,18 +15,15 @@ from moleculib.protein.alphabet import (
 )
 
 
-
-
-
 def protein_to_tensor_cloud(protein):
-    res_token = protein["residue_token"]
-    res_mask = protein["atom_mask"][..., 1]
+    res_token = protein.residue_token
+    res_mask = protein.atom_mask[..., 1]
+    vectors = protein.atom_coord
+    mask = protein.atom_mask
 
     scalars = jax.nn.one_hot(res_token, 23)
     scalars = scalars * res_mask[..., None]
 
-    mask = protein["atom_mask"]
-    vectors = protein["atom_coord"]
     ca_coord = vectors[..., 1, :]
 
     vectors = vectors - ca_coord[..., None, :]
@@ -65,7 +62,7 @@ def tensor_cloud_to_protein(state, protein=None, backbone_only=False):
         eos_logits = None
     else:
         invariants = irreps_array.filter(keep="0e")
-        logits = e3nn.haiku.MultiLayerPerceptron(
+        logits = e3nn.flax.MultiLayerPerceptron(
             [invariants.irreps.dim, invariants.irreps.num_irreps, 25],
             act=jax.nn.silu,
             output_activation=False,
@@ -76,7 +73,7 @@ def tensor_cloud_to_protein(state, protein=None, backbone_only=False):
             logits[..., -1],
             logits[..., -2],
         )
-        irreps_array = e3nn.haiku.Linear("14x1e")(irreps_array)
+        irreps_array = e3nn.flax.Linear("14x1e")(irreps_array)
 
     atom_coord = irreps_array.filter("1e").array
     atom_coord = rearrange(atom_coord, "r (a c) -> r a c", a=14)
@@ -86,7 +83,7 @@ def tensor_cloud_to_protein(state, protein=None, backbone_only=False):
     elif protein is None and backbone_only:
         sequence_token = jnp.full(res_logits.shape[0], all_residues.index("GLY"))
     else:
-        sequence_token = protein["residue_token"]
+        sequence_token = protein.residue_token
 
     logit_extract = repeat(sequence_token, "r -> r l", l=23) == repeat(
         jnp.arange(0, 23), "l -> () l"
@@ -96,8 +93,8 @@ def tensor_cloud_to_protein(state, protein=None, backbone_only=False):
         atom_token = (logit_extract[..., None] * all_residues_atom_tokens[None]).sum(-2)
         atom_mask = (logit_extract[..., None] * all_residues_atom_mask[None]).sum(-2)
     else:
-        atom_token = protein["atom_token"]
-        atom_mask = protein["atom_mask"]
+        atom_token = protein.atom_token
+        atom_mask = protein.atom_mask
 
     atom_coord = atom_coord.at[..., 1, :].set(0.0)
     atom_coord = atom_coord + ca_coord[..., None, :]

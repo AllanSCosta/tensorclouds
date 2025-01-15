@@ -478,8 +478,9 @@ class VectorMapLoss(LossFunction):
     def _call(
         self, rng_key, prediction: ProteinDatum, ground: ProteinDatum
     ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
+        ground = ground[0]
 
-        all_atom_coords = rearrange(prediction.atom_coord, "... a c -> (... a) c")
+        all_atom_coords = rearrange(prediction.datum['atom_coord'], "... a c -> (... a) c")
         all_atom_coords_ground = rearrange(ground.atom_coord, "... a c -> (... a) c")
         all_atom_mask = rearrange(ground.atom_mask, "... a -> (... a)")
 
@@ -543,7 +544,8 @@ class CrossEntropyLoss(LossFunction):
     def _call(
         self, rng_key, model_output: ModelOutput, ground: ProteinDatum
     ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
-        res_logits = model_output.residue_logits
+        res_logits = model_output.datum['residue_logits']
+        ground = ground[0]
 
         total_loss, metrics = 0.0, {}
 
@@ -598,6 +600,7 @@ class ChemicalViolationLoss(LossFunction):
     ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
         if getattr(self, "key") is None:
             raise ValueError("Must set key before calling ChemicalViolationLoss")
+        
         ground_coords = ground.atom_coord
         coords = model_output.atom_coord
 

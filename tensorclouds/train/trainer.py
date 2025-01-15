@@ -152,7 +152,7 @@ class Trainer:
     def init(self):
         print("Initializing Model...")
         init_datum = next(iter(self.loaders['train']))[0]
-        init_datum = [init_datum.to_pytree()] if type(init_datum) != list else [d.to_pytree() for d in init_datum] 
+        init_datum = [init_datum] if type(init_datum) != list else [d for d in init_datum] 
 
         self.rng_seq = jax.random.key(self.seed)
         self.rng_seq, init_rng = jax.random.split(self.rng_seq)
@@ -182,7 +182,7 @@ class Trainer:
 
         def _apply_losses(rng_key, datum: Any):
             model_output = self.transform.apply(
-                {"params": params}, *datum, True, rngs={"params": rng_key}
+                {"params": params}, *datum, rngs={"params": rng_key}
             )
             return self.losses(rng_key, model_output, datum, step)
 
@@ -235,7 +235,7 @@ class Trainer:
                 if len(data) != self.batch_size:
                     continue         
                        
-                batch = tree_stack([[d.to_pytree()] if type(d)!= list else [d_.to_pytree() for d_ in d] for d in data])
+                batch = tree_stack([[d] if type(d)!= list else [d_ for d_ in d] for d in data])
 
                 total_step = epoch * len(loader) + step
 
@@ -279,6 +279,7 @@ class Trainer:
                 if split == "train":
                     for k, v in step_metrics.items():
                         self.metrics[f"{split}/{k}"].append(float(v))
+
                     if self.run:
                         self.run.log(
                             {
@@ -289,13 +290,17 @@ class Trainer:
                                 "step": total_step,
                             }
                         )
+
                     if self.run and total_step % self.save_every == 0:
-                        checkpoint_path = self.run.dir + '/checkpoints'
-                        os.makedirs(checkpoint_path, exist_ok=True)
+                        registry_path = os.environ['OPHIUCHUS_REGISTRY_PATH']
+                        params_dir_path = os.path.join(registry_path, self.run.id, 'checkpoints')
+                        os.makedirs(params_dir_path, exist_ok=True)
+                        params_path = os.path.join(params_dir_path, f"state_{total_step}.pyd")
                         self.checkpoint_index = 0 # Currently no rule for checkpointing
-                        with open(checkpoint_path + f"/params_{self.checkpoint_index}.npy", "wb") as file:
-                            checkpoint = { 'params': jax.device_get(self.train_state.params) }
+                        with open(params_path, "wb") as file:
+                            checkpoint = self.train_state
                             pickle.dump(checkpoint, file)
+
 
 
 

@@ -52,7 +52,8 @@ class NormalDistribution:
             * self.irreps_scale
         )
         coords = jax.random.normal(coords_key, (*leading_shape, 3)) * self.coords_scale
-
+        # mask_features_arr = (e3nn.ones(self.irreps_in, leading_shape) * mask_features[..., None]).array
+        
         mask_features_arr = (e3nn.ones(self.irreps_in) * mask_features).array
         coords = mask_coord[..., None] * coords
         irreps = e3nn.IrrepsArray(

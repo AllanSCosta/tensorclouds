@@ -137,11 +137,8 @@ class CompleteSpatialConvolution(nn.Module):
         return state.replace(irreps_array=features)
 
 
-def knn(coord: jax.Array, mask: jax.Array, k: int, k_seq: int = None):
+def knn(coord: jax.Array, mask: jax.Array, k: int, k_seq: int = 0, k_rand: int = 0):
     n, d = coord.shape
-    assert mask.shape == (n,)
-    k = min(k, n - 1)
-
     distance_matrix = jnp.sum(
         jnp.square(coord[:, None, :] - coord[None, :, :]), axis=-1
     )
@@ -152,11 +149,10 @@ def knn(coord: jax.Array, mask: jax.Array, k: int, k_seq: int = None):
     distance_matrix = jnp.where(matrix_mask, distance_matrix, jnp.inf)
 
     # if k sequence nearest neighbors is on:
-    if k_seq is not None:
-        k_seqnn = 16
+    if k_seq != 0:
         seq_nei_matrix = jnp.zeros((n, n))
         eye = jnp.eye(n)
-        for i in range(1, k_seqnn // 2 + 1):
+        for i in range(1, k_seq // 2 + 1):
             up = jnp.roll(eye, i, axis=0)
             down = jnp.roll(eye, -i, axis=0)
             up = up - jnp.triu(up, k=0)
@@ -164,88 +160,29 @@ def knn(coord: jax.Array, mask: jax.Array, k: int, k_seq: int = None):
             seq_nei_matrix += up + down
         seq_nei_matrix = jnp.where(matrix_mask, seq_nei_matrix, 0)
         distance_matrix = jnp.where(seq_nei_matrix, -jnp.inf, distance_matrix)
+        
+    neg_dist, neighbors = jax.lax.top_k(-distance_matrix, k) # we include the self-convolution here
+    mask = neg_dist != -jnp.inf
 
-    distance_matrix = jnp.where(jnp.eye(n), jnp.inf, distance_matrix)
-    neg_dist, neighbors = jax.lax.top_k(-distance_matrix, k + 1)
-
-    mask = neg_dist[:, 1:] != -jnp.inf
-    neighbors = neighbors[:, 1:]
-
-    assert neighbors.shape == (n, k)
-    assert mask.shape == (n, k)
     return neighbors, mask
 
 
 class kNNSpatialConvolution(nn.Module):
-    def setup(
-        self,
-        irreps_out: e3nn.Irreps,
-        *,
-        k: int = 8,
-        k_seq: int = 8,
-        radial_cut: float = 32.0,
-        radial_bins: int = 42,
-        radial_basis: str = "fourier",
-        edge_irreps: e3nn.Irreps = e3nn.Irreps("0e + 1e + 2e"),
-        norm: bool = True,
-        activation: Callable = jax.nn.silu,
-        move: bool = True,
-        envelope: bool = False,
-    ):
-        self.irreps_out = e3nn.Irreps(irreps_out)
-        self.radial_cut = radial_cut
-        self.radial_bins = radial_bins
-        self.radial_basis = radial_basis
-        self.edge_irreps = e3nn.Irreps(edge_irreps)
-        self.norm = norm
-        self.activation = activation
-        self.k = k
-        self.k_seq = k_seq
-        self.move = move
-        self.envelope = envelope
 
-    def embedding(
-        self, state: TensorCloud, nei_indices: jax.Array, nei_mask: jax.Array
-    ) -> Tuple:
-        (seq_len, _) = state.irreps_array.shape
-        k = nei_indices.shape[1]
-        assert nei_indices.shape == (seq_len, k)
-        assert nei_mask.shape == (seq_len, k, 1)
+    irreps_out: e3nn.Irreps
+    radial_cut: float
+    radial_bins: int = 32
+    radial_basis: str = "gaussian"
+    edge_irreps: e3nn.Irreps = e3nn.Irreps("0e + 1e + 2e")
+    norm: bool = True
+    k_seq: int = 16
+    k: int = 16
+    k_rand: int = 0
+    attention: bool = False
+    activation: Callable = jax.nn.silu
 
-        vectors = state.coord[nei_indices, :] - state.coord[:, None, :]
-        norm_sqr = jnp.sum(vectors**2, axis=-1)
-        norm = jnp.sqrt(jnp.where(norm_sqr == 0.0, 1.0, norm_sqr))
-        assert norm.shape == (seq_len, k)
-
-        # Angular embedding:
-        ang_embed = nei_mask * e3nn.spherical_harmonics(
-            self.edge_irreps, vectors, False, "component"
-        )
-        assert ang_embed.shape == (seq_len, k, self.edge_irreps.dim)
-
-        # Radial embedding:
-        rad_embed = nei_mask * e3nn.soft_one_hot_linspace(
-            norm,
-            start=0.0,
-            end=self.radial_cut,
-            number=self.radial_bins,
-            basis=self.radial_basis,
-            cutoff=True,
-        )
-        assert rad_embed.shape == (seq_len, k, self.radial_bins)
-
-        # Envelope:
-        envelope = (
-            nei_mask
-            * e3nn.soft_envelope(
-                norm, x_max=self.radial_cut, arg_multiplicator=5.0, value_at_origin=1.0
-            )[:, :, None]
-        )
-        assert envelope.shape == (seq_len, k, 1)
-
-        return ang_embed, rad_embed, envelope
-
-    def _call(self, state: TensorCloud) -> TensorCloud:
+    @nn.compact
+    def __call__(self, state: TensorCloud) -> TensorCloud:
         seq_len = state.irreps_array.shape[0]
         assert state.irreps_array.shape == (seq_len, state.irreps_array.irreps.dim)
         assert state.mask.shape == (seq_len,)
@@ -258,23 +195,35 @@ class kNNSpatialConvolution(nn.Module):
             return state
 
         # k nearest neighbors:
+        k = min(self.k + 1, seq_len)
         nei_indices, nei_mask = knn(
             state.coord,
             state.mask_coord,
-            k=self.k,
+            k=k,
             k_seq=self.k_seq,
+            k_rand=self.k_rand,
         )
         k = nei_indices.shape[1]
-        assert nei_indices.shape == (seq_len, k)
-        assert nei_mask.shape == (seq_len, k)
 
         # Embeddings:
-        ang_embed, rad_embed, envelope = self.embedding(
-            state, nei_indices, nei_mask[:, :, None]
+        vectors = state.coord[nei_indices, :] - state.coord[:, None, :]
+        norm_sqr = jnp.sum(vectors**2, axis=-1)
+        norm = jnp.sqrt(jnp.where(norm_sqr == 0.0, 1.0, norm_sqr))
+
+        # Angular embedding:
+        ang_embed = e3nn.spherical_harmonics(
+            self.edge_irreps, vectors, False, "component"
         )
-        assert ang_embed.shape == (seq_len, k, self.edge_irreps.dim)
-        assert rad_embed.shape == (seq_len, k, self.radial_bins)
-        assert envelope.shape == (seq_len, k, 1)
+
+        # Radial embedding:
+        rad_embed = nei_mask[..., None] * e3nn.soft_one_hot_linspace(
+            norm,
+            start=0.0,
+            end=self.radial_cut,
+            number=self.radial_bins,
+            basis=self.radial_basis,
+            cutoff=True,
+        )
 
         nei_states = nei_mask[:, :, None] * state.irreps_array[nei_indices, :]
         # Angular part:
@@ -283,7 +232,6 @@ class kNNSpatialConvolution(nn.Module):
                 [e3nn.tensor_product(ang_embed, nei_states), ang_embed], axis=-1
             ).regroup()
         )
-        assert messages.shape == (seq_len, k, messages.irreps.dim)
 
         # Radial part:
         features_expanded = repeat(features.filter("0e").array, "... d -> ... k d", k=k)
@@ -296,28 +244,11 @@ class kNNSpatialConvolution(nn.Module):
             with_bias=True,
             output_activation=False,
         )(rad_embed)
-        assert mix.shape == (seq_len, k, messages.irreps.num_irreps)
-
-        if self.envelope:
-            mix = mix * envelope
 
         # Sum over neighbors:
         features = e3nn.sum(messages * mix, axis=1) / k
 
-        # Update coordinates:
-        if self.move:
-            update = 1e-3 * e3nn.flax.Linear("1e")(features).array
-            new_coord = state.coord + update
-            state = state.replace(coord=new_coord)
-
         return state.replace(irreps_array=features)
-
-    def __call__(self, state: TensorCloud) -> TensorCloud:
-        state = Residual(self._call)(state)
-        if self.norm:
-            irreps_array = EquivariantLayerNorm()(state.irreps_array)
-            state = state.replace(irreps_array=irreps_array)
-        return state
 
 
 # class IPA(nn.Module):

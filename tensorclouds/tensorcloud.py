@@ -6,6 +6,7 @@ import jax.numpy as jnp
 import numpy as np
 from einops import rearrange
 from flax import struct
+import py3Dmol
 
 
 @struct.dataclass
@@ -113,7 +114,10 @@ class TensorCloud:
         coord = jnp.where(jnp.isnan(coord), 0.0, coord)
         return self.replace(coord=coord)
 
-    def plot(self, view, viewer=None, colors=None, radius=0.04, mid=0.95):
+    def plot(self, view=None, viewer=None, colors=None, radius=0.04, mid=0.95):
+        if view is None:
+            view = py3Dmol.view(width=800, height=400)
+
         if viewer is None:
             viewer = (0, 0)
 
