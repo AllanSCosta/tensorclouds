@@ -160,8 +160,6 @@ class Trainer:
         self.rng_seq = jax.random.key(self.seed)
         self.rng_seq, init_rng = jax.random.split(self.rng_seq)
 
-        jax.clear_caches()
-        jax.clear_backends()
 
         def _init(rng, *datum):
             param_rng, _ = jax.random.split(rng)
