@@ -7,7 +7,7 @@ from flax import linen as nn
 from typing import Callable, NamedTuple, Tuple, Dict, Any
 
 import jax
-from jax.tree_util import tree_reduce
+from jax.tree_util import tree_map, tree_reduce
 import jax.numpy as jnp
 import numpy as np
 import optax
@@ -19,6 +19,11 @@ from wandb.sdk.wandb_run import Run
 from torch.utils.data import DataLoader
 import torch
 
+
+from jax.experimental import mesh_utils
+from jax.sharding import PositionalSharding
+from jax.sharding import PartitionSpec as P
+from jax.sharding import Mesh, NamedSharding
 
 def in_notebook():
     try:
@@ -39,48 +44,62 @@ else:
     from tqdm import tqdm
 
 
-
-
 class TrainState(NamedTuple):
     params: Any
     opt_state: Any
 
 
-
-
 def tree_stack(trees):
-    return jax.tree_util.tree_map(lambda *v: np.stack(v) if type(v[0]) != str else None, *trees)
+    def _stack(*v):
+        try:
+            if type(v[0]) == np.ndarray or type(v[0]) == jnp.ndarray:
+                return np.stack(v)
+            else:
+                return None
+        except:
+            breakpoint()
+    return tree_map(_stack, *trees)
 
 
 def tree_unstack(tree):
     leaves, treedef = jax.tree_util.tree_flatten(tree)
     return [treedef.unflatten(leaf) for leaf in zip(*leaves, strict=True)]
 
+import einops as ein
+
 
 class Trainer:
 
     def __init__(
         self,
+
         model: nn.Module,
         learning_rate,
         losses,
         seed,
-        dataset,
+        train_dataset,
         num_epochs,
         batch_size,
         num_workers,
         save_every,
-        validate_every,
+
+        val_every: int = None,
+        val_dataset: Any = None,
+
         save_model: Callable = None,
         run: Run = None,
+        registry = None,
+        compile: bool = False,
         single_datum: bool = False,
         single_batch: bool = False,
         train_only: bool = False,
+
         plot_pipe: Callable = None,
         plot_every: int = 1000,
         plot_model: Callable = None,
         # plot_metrics: MetricsPipe = None,
         load_weights: bool = False,
+
         sample_every: int = None,
         sample_model: Callable = None,
         sample_params: str = None,
@@ -92,13 +111,20 @@ class Trainer:
         # torch.multiprocessing.set_start_method('spawn')
         self.transform = model
 
-        self.optimizer = optax.adam(learning_rate, 0.9, 0.999)
+        # self.optimizer = optax.adam(learning_rate, 0.9, 0.999)
+        self.optimizer = optax.inject_hyperparams(optax.adam)(learning_rate, 0.9, 0.999)
 
         self.losses = losses
-        self.dataset = dataset
+        self.train_dataset = train_dataset
         self.num_epochs = num_epochs
         self.seed = seed
         self.save_every = save_every
+
+        if registry == None:
+            self.registry_path = None
+        else:
+            self.registry_path = os.environ.get('TRAINAX_REGISTRY_PATH') + '/' + registry
+
         self.batch_size = batch_size
         self.num_workers = num_workers
         print(f"Batch Size: {self.batch_size}")
@@ -107,18 +133,20 @@ class Trainer:
 
         self.name = self.run.name if run else "trainer"
         self.max_grad = 1000.0
-        self.loaders = {
-            split: DataLoader(
-                self.dataset.splits[split],
+
+        def _make_loader(dataset):
+            return DataLoader(
+                dataset,
                 batch_size=self.batch_size,
                 num_workers=self.num_workers,
                 collate_fn=lambda x: x,
                 shuffle=True,
-            ) for split in self.dataset.splits
-        }
+            )
 
-        if self.batch_size == None:
-            self.batch_size = self.dataset.batch_size
+        self.loaders = {
+            'train': _make_loader(train_dataset),
+            'val': _make_loader(val_dataset) if val_dataset else None
+        }
 
         self.train_only = train_only
         self.single_batch = single_batch
@@ -141,18 +169,26 @@ class Trainer:
         self.plot_model = plot_model
         # self.plot_metrics = plot_metrics
 
-        self.validate_every = validate_every
+        self.val_every = val_every
         self.load_weights = load_weights
 
         self.sample_every = sample_every
         self.metrics = defaultdict(list)
+
+        distribute = True
+        self.distribute = distribute
+        self.device_count = jax.local_device_count() if self.distribute else 1
+
+        if self.distribute:
+            mesh = Mesh(mesh_utils.create_device_mesh((self.device_count,)), axis_names=("ax"))
+            self.sharding = NamedSharding(mesh, P("ax"))
 
         self.init()
 
     def init(self):
         print("Initializing Model...")
         init_datum = next(iter(self.loaders['train']))[0]
-        init_datum = [init_datum] if type(init_datum) != list else [d for d in init_datum] 
+        init_datum = [init_datum] if type(init_datum) != list else init_datum
 
         self.rng_seq = jax.random.key(self.seed)
         self.rng_seq, init_rng = jax.random.split(self.rng_seq)
@@ -177,14 +213,13 @@ class Trainer:
         if self.run:
             self.run.summary["NUM_PARAMS"] = num_params
 
-    @functools.partial(jax.jit, static_argnums=(0,))
     def loss(self, params, keys, batch, step):
-
         def _apply_losses(rng_key, datum: Any):
             model_output = self.transform.apply(
                 {"params": params}, *datum, rngs={"params": rng_key}
             )
             return self.losses(rng_key, model_output, datum, step)
+
 
         output, loss, metrics = jax.vmap(_apply_losses, in_axes=(0, 0))(keys, batch)
 
@@ -194,19 +229,43 @@ class Trainer:
 
         return loss, (output, loss, metrics)
 
-    @functools.partial(jax.jit, static_argnums=(0,))
-    def update(self, rng, state, batch, step):
-        grad, (output, loss, metrics) = jax.grad(
+    @functools.partial(
+        jax.pmap,
+        static_broadcasted_argnums=(0,),
+        in_axes=(None, None, 0, 0, None),
+        axis_name='devices'
+    )
+    def grad(self, params, keys, batch, step):
+        return jax.grad(
             lambda params, rng, batch, step: self.loss(params, rng, batch, step),
             has_aux=True,
-        )(state.params, rng, batch, step)
+        )(params, keys, batch, step)
 
-        # reduce gradients & metrics
-        loss = loss.mean()
+
+    def grad_non_pmapped(self, params, keys, batch, step):
+        data = tree_unstack(batch)
+        keys = tree_unstack(keys)
+        grads = []
+        metrics = []
+        for d, k in zip(data, keys):
+            grad, metrics_ = jax.grad(lambda params, rng, batch, step: self.loss(params, rng, batch, step), has_aux=True)(params, k, d, step)
+            grads.append(grad)
+            metrics.append(metrics_)
+        return tree_stack(grads), tree_stack(metrics)
+
+    def update(self, rng, state, batch, step):
+        grad, (output, loss, metrics) = self.grad(state.params, rng, batch, step)
+
+        # reduce metrics
+        metrics = tree_map(lambda v: jnp.mean(v), metrics)
+        loss = jnp.mean(loss)
         metrics = dict(loss=loss, **metrics)
 
-        # clip gradients
-        grad = clip_grads(grad, self.max_grad)
+        # reduce gradients
+        grad = tree_map(lambda v: jnp.mean(v, axis=0), grad)
+
+        #  clip gradients
+        grad = tree_map(lambda v: jnp.clip(v, -self.max_grad, self.max_grad), grad)
 
         # update parameters
         updates, opt_state = self.optimizer.update(grad, state.opt_state, state.params)
@@ -214,11 +273,10 @@ class Trainer:
 
         return output, TrainState(params, opt_state), metrics
 
-    def epoch(self, epoch) -> Tuple[Dict, Dict]:
-
+    def epoch(self, epoch):
         for split in self.loaders.keys():
             if (self.train_only and split != "train") or (
-                split != "train" and epoch % self.validate_every != 0
+                self.val_every and (split != "train") and (epoch % self.val_every != 0)
             ):
                 continue
 
@@ -231,20 +289,27 @@ class Trainer:
             epoch_metrics = defaultdict(list)
 
             for step, data in enumerate(pbar):
-
                 if len(data) != self.batch_size:
-                    continue         
-                       
-                batch = tree_stack([[d] if type(d)!= list else [d_ for d_ in d] for d in data])
+                    continue
+
+                batch = tree_stack([[d] if type(d)!= list else d for d in data])
+
+                # prepare for pmap
+                device_count = self.device_count
+                batch_size = self.batch_size
+
+                batch = tree_map(lambda v: ein.rearrange(v, '(p q) ... -> p q ...', p=device_count, q=batch_size // device_count) if not (v is None) else v, batch)
+                # batch = jax.device_put(batch, self.sharding)
+                # batch = tree_map(lambda v: ein.rearrange(v, 'p q ... -> (p q) ...') if not (v is None) else v, batch)
 
                 total_step = epoch * len(loader) + step
 
                 self.rng_seq, subkey = jax.random.split(self.rng_seq)
                 keys = jax.random.split(subkey, len(data))
+                keys = ein.rearrange(keys, '(p q) ... -> p q ...', p=device_count, q=batch_size // device_count)
 
-                batched = batch
                 output, new_train_state, step_metrics = self.update(
-                    keys, self.train_state, batched, total_step
+                    keys, self.train_state, batch, total_step
                 )
                 output = inner_split(output)
                 pbar.set_postfix({"loss": f"{step_metrics['loss']:.3e}"})
@@ -255,26 +320,10 @@ class Trainer:
                 )
 
                 step_metrics.update(dict(has_nan=has_nan))
+                step_metrics.update({'learning_rate': self.train_state.opt_state.hyperparams['learning_rate']})
 
                 if not has_nan and split == "train":
                     self.train_state = new_train_state
-
-                if (
-                    (self.plot_pipe is not None)
-                    and split == "train"
-                    and total_step % self.plot_every == 0
-                ):
-                    self.plot_pipe(self.run, output, batch)
-
-                if (
-                    (self.sample_every is not None)
-                    and split == "train"
-                    and total_step % self.sample_every == 0
-                ):
-                    sample_metrics = self.run_sample(
-                        self.rng_seq, self.train_state, batch, total_step
-                    )
-                    step_metrics.update({f"{k}": v for k, v in sample_metrics.items()})
 
                 if split == "train":
                     for k, v in step_metrics.items():
@@ -291,29 +340,34 @@ class Trainer:
                             }
                         )
 
-                    if self.run and total_step % self.save_every == 0:
-                        registry_path = os.environ['OPHIUCHUS_REGISTRY_PATH']
+                    if self.run and self.registry_path and total_step % self.save_every == 0:
+                        registry_path = self.registry_path
                         params_dir_path = os.path.join(registry_path, self.run.id, 'checkpoints')
                         os.makedirs(params_dir_path, exist_ok=True)
                         params_path = os.path.join(params_dir_path, f"state_{total_step}.pyd")
-                        self.checkpoint_index = 0 # Currently no rule for checkpointing
                         with open(params_path, "wb") as file:
-                            checkpoint = self.train_state
+                            checkpoint = jax.device_get(self.train_state)
                             pickle.dump(checkpoint, file)
 
-
-
+                    if self.run and self.registry_path and total_step % 300 == 0:
+                        registry_path = self.registry_path
+                        params_dir_path = os.path.join(registry_path, self.run.id, 'checkpoints')
+                        os.makedirs(params_dir_path, exist_ok=True)
+                        params_path = os.path.join(params_dir_path, f"state_latest.pyd")
+                        with open(params_path, "wb") as file:
+                            checkpoint = jax.device_get(self.train_state)
+                            pickle.dump(checkpoint, file)
 
                 for k, v in step_metrics.items():
                     epoch_metrics[k].append(v)
 
             for k, v in epoch_metrics.items():
-                self.metrics[f"{split}/{k}_epoch"].append(float(np.mean(v)))
+                self.metrics[f"{split}_epoch/{k}"].append(float(np.mean(v)))
                 if self.run:
                     self.run.log(
                         {
                             **{
-                                f"{split}/{k}_epoch": float(np.mean(v))
+                                f"{split}_epoch/{k}": float(np.mean(v))
                                 for (k, v) in epoch_metrics.items()
                             },
                             "epoch": epoch,

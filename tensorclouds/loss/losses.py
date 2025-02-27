@@ -105,7 +105,7 @@ class AtomPermLoss(LossFunction):
 
 class StochasticInterpolantLoss(LossFunction):
 
-    def _call(self, _, model_output: ModelOutput, __: ProteinDatum):    
+    def _call(self, _, model_output: ModelOutput, __: ProteinDatum):
         if type(model_output) == tuple:
             aggr_loss = 0.0
             metrics = defaultdict(float)
@@ -124,14 +124,18 @@ class StochasticInterpolantLoss(LossFunction):
             feature_dot1, coord_dot1 = pred.norm()
             feature_dot2, coord_dot2 = pred.dot(target)
 
+            out = ((feature_dot2 > 2000) * jnp.arange(384))
+
             feature_loss = 0.5 * feature_dot1 + feature_dot2
             coord_loss = 0.5 * coord_dot1 + coord_dot2
 
             feature_loss = 100 * feature_loss.mean()
             coord_loss = 100 * coord_loss.mean()
-            return feature_loss, coord_loss
-                
-        features_loss, coord_loss = stochastic_interpolant_loss(pred, -target)
+            return feature_loss, coord_loss, out
+
+        features_loss, coord_loss, out = stochastic_interpolant_loss(pred, -target)
+        # jax.debug.print('{x}', x=out)
+        # breakpoint()
         return model_output, features_loss + coord_loss, { 'features_loss': features_loss, 'coord_loss': coord_loss }
 
 class TensorCloudMatchingLoss(LossFunction):
@@ -165,8 +169,8 @@ class TensorCloudMatchingLoss(LossFunction):
         features_loss = reweight * features_loss
 
         features_mask = (target.mask_irreps_array * e3nn.ones(target.irreps_array.irreps, target.irreps_array.shape[:-1])).array
-        features_loss = 100 * jnp.sum(features_loss * features_mask) 
-                
+        features_loss = 100 * jnp.sum(features_loss * features_mask)
+
         if reduction == 'mean':
             features_loss = features_loss / (jnp.sum(features_mask) + 1e-6)
 
@@ -600,9 +604,10 @@ class ChemicalViolationLoss(LossFunction):
     ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
         if getattr(self, "key") is None:
             raise ValueError("Must set key before calling ChemicalViolationLoss")
-        
+        ground = ground[0]
+
         ground_coords = ground.atom_coord
-        coords = model_output.atom_coord
+        coords = model_output.datum['atom_coord']
 
         indices = getattr(ground, f"{self.key}_list")
         mask = getattr(ground, f"{self.key}_mask")
@@ -695,7 +700,9 @@ class DihedralLoss(ChemicalViolationLoss):
 
 class ClashLoss(LossFunction):
     def _call(self, rng_key, model_output: ModelOutput, ground: ProteinDatum):
-        coords = model_output.atom_coord
+        ground = ground[0]
+
+        coords = model_output.datum['atom_coord']
         all_atom_coords = rearrange(coords, "r a c -> (r a) c")
         all_atom_radii = rearrange(ground.atom_radius, "r a -> (r a)")
         all_atom_mask = rearrange(ground.atom_mask, "r a -> (r a)")
