@@ -13,7 +13,6 @@ import numpy as np
 import optax
 import functools
 
-from .utils import inner_stack, clip_grads, inner_split
 
 from wandb.sdk.wandb_run import Run
 from torch.utils.data import DataLoader
@@ -36,7 +35,6 @@ def in_notebook():
     except AttributeError:
         return False
     return True
-
 
 if in_notebook():
     from tqdm.notebook import tqdm
@@ -211,7 +209,7 @@ class Trainer:
 
         print(f"Model has {num_params:.3e} parameters")
         if self.run:
-            self.run.summary["NUM_PARAMS"] = num_params
+            self.run.log({"model/num_params": num_params})
 
     def loss(self, params, keys, batch, step):
         def _apply_losses(rng_key, datum: Any):
@@ -263,9 +261,12 @@ class Trainer:
 
         # reduce gradients
         grad = tree_map(lambda v: jnp.mean(v, axis=0), grad)
+ m        grad = tree_map(lambda v: jnp.clip(v, -self.max_grad, self.max_grad), grad)
 
-        #  clip gradients
-        grad = tree_map(lambda v: jnp.clip(v, -self.max_grad, self.max_grad), grad)
+        # get mean gradient norm for metrics
+        mean_abs_grad = tree_map(lambda v: jnp.mean(jnp.linalg.norm(v)), grad)
+        mean_grad_norm = tree_reduce(lambda x, y: x + y, mean_abs_grad) / tree_reduce(lambda x, y: x + y, tree_map(lambda v: 1, mean_abs_grad))
+        metrics.update({'mean_grad_norm': mean_grad_norm})
 
         # update parameters
         updates, opt_state = self.optimizer.update(grad, state.opt_state, state.params)
@@ -275,6 +276,8 @@ class Trainer:
 
     def epoch(self, epoch):
         for split in self.loaders.keys():
+            if self.loaders[split] == None: continue
+
             if (self.train_only and split != "train") or (
                 self.val_every and (split != "train") and (epoch % self.val_every != 0)
             ):
@@ -311,7 +314,6 @@ class Trainer:
                 output, new_train_state, step_metrics = self.update(
                     keys, self.train_state, batch, total_step
                 )
-                output = inner_split(output)
                 pbar.set_postfix({"loss": f"{step_metrics['loss']:.3e}"})
 
                 _param_has_nan = lambda agg, p: jnp.isnan(p).any() | agg

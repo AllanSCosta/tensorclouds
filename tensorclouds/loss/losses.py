@@ -119,23 +119,21 @@ class StochasticInterpolantLoss(LossFunction):
 
         pred = model_output.prediction
         target = model_output.target
+        pred = pred.replace(mask_irreps_array=target.mask_irreps_array)
 
         def stochastic_interpolant_loss(pred, target):
             feature_dot1, coord_dot1 = pred.norm()
             feature_dot2, coord_dot2 = pred.dot(target)
-
-            out = ((feature_dot2 > 2000) * jnp.arange(384))
 
             feature_loss = 0.5 * feature_dot1 + feature_dot2
             coord_loss = 0.5 * coord_dot1 + coord_dot2
 
             feature_loss = 100 * feature_loss.mean()
             coord_loss = 100 * coord_loss.mean()
-            return feature_loss, coord_loss, out
+            return feature_loss, coord_loss
 
-        features_loss, coord_loss, out = stochastic_interpolant_loss(pred, -target)
-        # jax.debug.print('{x}', x=out)
-        # breakpoint()
+        features_loss, coord_loss = stochastic_interpolant_loss(pred, -target)
+
         return model_output, features_loss + coord_loss, { 'features_loss': features_loss, 'coord_loss': coord_loss }
 
 class TensorCloudMatchingLoss(LossFunction):
