@@ -265,7 +265,7 @@ class Trainer:
 
         # reduce gradients
         grad = tree_map(lambda v: jnp.mean(v, axis=0), grad)
- m        grad = tree_map(lambda v: jnp.clip(v, -self.max_grad, self.max_grad), grad)
+        grad = tree_map(lambda v: jnp.clip(v, -self.max_grad, self.max_grad), grad)
 
         # get mean gradient norm for metrics
         mean_abs_grad = tree_map(lambda v: jnp.mean(jnp.linalg.norm(v)), grad)
