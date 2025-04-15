@@ -57,36 +57,27 @@ class CompleteSpatialConvolution(nn.Module):
         vectors = (coord_i - coord_j) * cross_mask[..., None]
         norm_sqr = jnp.sum(vectors**2, axis=-1)
         norm = jnp.where(
-            norm_sqr == 0.0, 0.0,
-            jnp.sqrt(jnp.where(norm_sqr == 0.0, 1.0, norm_sqr))
+            norm_sqr == 0.0, 0.0, jnp.sqrt(jnp.where(norm_sqr == 0.0, 1.0, norm_sqr))
         )
-
-
-        # Angular embedding:
-        # edge_irreps = [ irrep for (mul, irrep) in self.edge_irreps ]
-        # edge_irreps = e3nn.Irreps(edge_irreps)
 
         ang_embed = e3nn.spherical_harmonics(
             self.edge_irreps, vectors, False, "component"
         )
         ang_embed = ang_embed * cross_mask[..., None].astype(ang_embed.array.dtype)
 
-        # messages_i = e3nn.flax.Linear(self.irreps_out)(
-        #     e3nn.tensor_product(ang_embed, features_i)
-        # )
-
-        messages_j = e3nn.flax.Linear(self.irreps_out)(
+        messages_j = e3nn.flax.Linear(self.irreps_out, name="linear_messages_j")(
             e3nn.tensor_product(ang_embed, features_j)
         )
 
+        messages = e3nn.concatenate(
+            [
+                messages_j,
+                ang_embed,
+            ],
+            axis=-1,
+        ).regroup()
 
-        messages = e3nn.concatenate([
-            # messages_i,
-            messages_j,
-            ang_embed,
-        ], axis=-1).regroup()
-
-        # Radial part:
+        # Radial part
         rad_embed = (
             e3nn.soft_one_hot_linspace(
                 norm,
@@ -109,33 +100,40 @@ class CompleteSpatialConvolution(nn.Module):
             jnp.abs(relative_seq_pos) <= k_seq, relative_seq_pos, 0
         )
         relative_seq_pos = jnp.where(cross_mask, relative_seq_pos, 0)
-
         relative_seq_pos = relative_seq_pos + k_seq
-        relative_seq_pos = nn.Embed(num_embeddings=2 * k_seq + 1, features=32)(
-            relative_seq_pos
-        )
 
-        rad_embed = e3nn.concatenate([relative_seq_pos, rad_embed, messages.filter('0e')], axis=-1).regroup()
-        rad_embed = e3nn.flax.MultiLayerPerceptron(
+        relative_seq_embed = nn.Embed(
+            num_embeddings=2 * k_seq + 1, features=32, name="embed_seq_pos"
+        )(relative_seq_pos)
+
+        rad_input = e3nn.concatenate(
+            [relative_seq_embed, rad_embed, messages.filter("0e")], axis=-1
+        ).regroup()
+
+        rad_mlp = e3nn.flax.MultiLayerPerceptron(
             [self.radial_bins, messages.irreps.num_irreps],
             self.activation,
             with_bias=True,
             output_activation=False,
-        )(rad_embed)
+            name="radial_mlp",
+        )(rad_input)
 
         messages = (
-            messages * rad_embed * cross_mask[..., None].astype(messages.array.dtype)
+            messages * rad_mlp * cross_mask[..., None].astype(messages.array.dtype)
         )
 
         features_aggr = e3nn.sum(messages, axis=1) / (
             jnp.sum(cross_mask, axis=1, keepdims=True) + 1e-6
         )
         features_aggr = features_aggr * (jnp.sum(cross_mask, axis=1, keepdims=True) > 1)
-        features = e3nn.flax.Linear(self.irreps_out)(features_aggr)
+
+        features = e3nn.flax.Linear(self.irreps_out, name="linear_out")(features_aggr)
 
         if self.move:
-            update = 1e-3 * e3nn.flax.Linear("1e")(features).array
-            new_coord = state.coord + update
+            move_update = (
+                1e-3 * e3nn.flax.Linear("1e", name="linear_move")(features).array
+            )
+            new_coord = state.coord + move_update
             state = state.replace(coord=new_coord)
 
         return state.replace(irreps_array=features)
@@ -150,8 +148,6 @@ def safe_norm(vector: jax.Array, axis: int = -1) -> jax.Array:
 
 def safe_normalize(vector: jax.Array) -> jax.Array:
     return vector / safe_norm(vector)[..., None]
-
-
 
 
 def knn(coord: jax.Array, mask: jax.Array, k: int, k_seq: int = None):
@@ -189,12 +185,7 @@ def knn(coord: jax.Array, mask: jax.Array, k: int, k_seq: int = None):
     return neighbors, mask
 
 
-
-
-
-
 from e3nn_jax.experimental.linear_shtp import LinearSHTP
-
 
 
 class kNNSpatialConvolution(nn.Module):
@@ -225,7 +216,7 @@ class kNNSpatialConvolution(nn.Module):
             return state
 
         # SCATTER INPUTS
-        k = self.k 
+        k = self.k
         k = min(k + 1, seq_len)
 
         nei_indices, nei_mask = knn(
@@ -238,7 +229,7 @@ class kNNSpatialConvolution(nn.Module):
         features_i = e3nn.IrrepsArray(
             features.irreps, repeat(features.array, "i h -> i k h", k=k)
         )
-                
+
         features_j = nei_mask[:, :, None] * features[nei_indices]
 
         coord = state.coord
@@ -253,11 +244,10 @@ class kNNSpatialConvolution(nn.Module):
         vectors = (coord_i - coord_j) * nei_mask[..., None]
         norm_sqr = jnp.sum(vectors**2, axis=-1)
         norm = jnp.where(
-            norm_sqr == 0.0, 0.0,
-            jnp.sqrt(jnp.where(norm_sqr == 0.0, 1.0, norm_sqr))
+            norm_sqr == 0.0, 0.0, jnp.sqrt(jnp.where(norm_sqr == 0.0, 1.0, norm_sqr))
         )
 
-        edge_irreps = e3nn.Irreps([ mulir.ir for mulir in features_j.irreps ])
+        edge_irreps = e3nn.Irreps([mulir.ir for mulir in features_j.irreps])
         # edge_irreps = features_j.irreps
         # edge_irreps = e3nn.Irreps('1x1e')
 
@@ -294,7 +284,7 @@ class kNNSpatialConvolution(nn.Module):
         relative_seq_pos = nn.Embed(num_embeddings=2 * k_seq + 1, features=32)(
             relative_seq_pos
         )
-        
+
         # MAKE MESSAGES
 
         # STANDARD TFN
@@ -306,16 +296,16 @@ class kNNSpatialConvolution(nn.Module):
 
         # eSCN
         conv = LinearSHTP(self.irreps_out)
-        vectors = e3nn.IrrepsArray('1e', vectors)
+        vectors = e3nn.IrrepsArray("1e", vectors)
         messages = jax.vmap(jax.vmap(conv))(features_j, vectors)
 
-        # SIMPLE CAT 
+        # SIMPLE CAT
         # messages = e3nn.flax.Linear(self.irreps_out)(
         #     e3nn.concatenate(
         #         [features_j, ang_embed], axis=-1
         #     ).regroup()
         # )
-        
+
         # L-WISE
         # tps = []
         # for (mulir) in features_j.irreps:
@@ -324,15 +314,15 @@ class kNNSpatialConvolution(nn.Module):
         #         e3nn.tensor_product(features_j.filter(keep=ir), ang_embed.filter(keep=ir))
         #     )
         # messages = e3nn.concatenate(tps + [ang_embed], axis=-1).regroup()
-        
-        # ELEMENT-WISE 
+
+        # ELEMENT-WISE
         # messages = e3nn.flax.Linear(self.irreps_out)(
-            # e3nn.concatenate(
-                # [e3nn.elementwise_tensor_product(features_j, ang_embed)], axis=-1
-            # ).regroup()
+        # e3nn.concatenate(
+        # [e3nn.elementwise_tensor_product(features_j, ang_embed)], axis=-1
+        # ).regroup()
         # )
 
-        # GAUNT TP 
+        # GAUNT TP
         # lmax = 2
         # messages = GauntTensorProductS2Grid(
         #     res_beta=2 * lmax + 1,
@@ -345,9 +335,14 @@ class kNNSpatialConvolution(nn.Module):
         # )(features_j, ang_embed)
 
         # GATE MESSAGES
-        gate = e3nn.concatenate([
-            relative_seq_pos, rad_embed, messages.filter('0e'),
-        ], axis=-1).regroup()
+        gate = e3nn.concatenate(
+            [
+                relative_seq_pos,
+                rad_embed,
+                messages.filter("0e"),
+            ],
+            axis=-1,
+        ).regroup()
 
         gate = e3nn.flax.MultiLayerPerceptron(
             [messages.irreps.num_irreps],
@@ -357,19 +352,14 @@ class kNNSpatialConvolution(nn.Module):
         )(gate)
 
         # AGGREGATE
-        messages = (
-            messages * gate * cross_mask[..., None].astype(messages.array.dtype)
-        )
+        messages = messages * gate * cross_mask[..., None].astype(messages.array.dtype)
 
-        new_features = e3nn.sum(messages, axis=1) / (jnp.sum(nei_mask, axis=1, keepdims=True) + 1e-6)
+        new_features = e3nn.sum(messages, axis=1) / (
+            jnp.sum(nei_mask, axis=1, keepdims=True) + 1e-6
+        )
         new_features = new_features * (jnp.sum(cross_mask, axis=1, keepdims=True) > 1)
 
         return state.replace(irreps_array=new_features)
-
-
-
-
-
 
 
 class kNNEquiformerSpatialConvolution(nn.Module):
@@ -400,7 +390,7 @@ class kNNEquiformerSpatialConvolution(nn.Module):
             return state
 
         # SCATTER INPUTS
-        k = self.k 
+        k = self.k
         k = min(k + 1, seq_len)
 
         nei_indices, nei_mask = knn(
@@ -413,7 +403,7 @@ class kNNEquiformerSpatialConvolution(nn.Module):
         features_i = e3nn.IrrepsArray(
             features.irreps, repeat(features.array, "i h -> i k h", k=k)
         )
-                
+
         features_j = nei_mask[:, :, None] * features[nei_indices]
 
         coord = state.coord
@@ -428,11 +418,10 @@ class kNNEquiformerSpatialConvolution(nn.Module):
         vectors = (coord_i - coord_j) * nei_mask[..., None]
         norm_sqr = jnp.sum(vectors**2, axis=-1)
         norm = jnp.where(
-            norm_sqr == 0.0, 0.0,
-            jnp.sqrt(jnp.where(norm_sqr == 0.0, 1.0, norm_sqr))
+            norm_sqr == 0.0, 0.0, jnp.sqrt(jnp.where(norm_sqr == 0.0, 1.0, norm_sqr))
         )
 
-        edge_irreps = e3nn.Irreps([ mulir.ir for mulir in features_j.irreps ])
+        edge_irreps = e3nn.Irreps([mulir.ir for mulir in features_j.irreps])
         # edge_irreps = features_j.irreps
         # edge_irreps = e3nn.Irreps('1x1e')
 
@@ -469,19 +458,23 @@ class kNNEquiformerSpatialConvolution(nn.Module):
         relative_seq_pos = nn.Embed(num_embeddings=2 * k_seq + 1, features=32)(
             relative_seq_pos
         )
-        
+
         # MAKE MESSAGES
         # eSCN
-        vectors = e3nn.IrrepsArray('1e', vectors)
+        vectors = e3nn.IrrepsArray("1e", vectors)
         messages = jax.vmap(jax.vmap(LinearSHTP(self.irreps_out)))(
-            e3nn.concatenate([features_i, features_j], axis=-1), 
-            vectors
+            e3nn.concatenate([features_i, features_j], axis=-1), vectors
         )
 
         # GATE & ATTENTION
-        scalars = e3nn.concatenate([
-            relative_seq_pos, rad_embed, messages.filter('0e'),
-        ], axis=-1).regroup()
+        scalars = e3nn.concatenate(
+            [
+                relative_seq_pos,
+                rad_embed,
+                messages.filter("0e"),
+            ],
+            axis=-1,
+        ).regroup()
 
         gate = e3nn.flax.MultiLayerPerceptron(
             [scalars.irreps.num_irreps, messages.irreps.num_irreps],
@@ -506,8 +499,9 @@ class kNNEquiformerSpatialConvolution(nn.Module):
             attn * messages * gate * cross_mask[..., None].astype(messages.array.dtype)
         )
 
-        new_features = e3nn.sum(messages, axis=1) / (jnp.sum(nei_mask, axis=1, keepdims=True) + 1e-6)
+        new_features = e3nn.sum(messages, axis=1) / (
+            jnp.sum(nei_mask, axis=1, keepdims=True) + 1e-6
+        )
         new_features = new_features * (jnp.sum(cross_mask, axis=1, keepdims=True) > 1)
 
         return state.replace(irreps_array=new_features)
-
