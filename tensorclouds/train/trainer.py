@@ -121,11 +121,7 @@ class Trainer:
         self.num_epochs = num_epochs
         self.seed = seed
         self.save_every = save_every
-
-        if registry == None:
-            self.registry_path = None
-        else:
-            self.registry_path = os.environ.get('TRAINAX_REGISTRY_PATH') + '/' + registry
+        self.registry_path = registry
 
         self.batch_size = batch_size
         self.num_workers = num_workers
