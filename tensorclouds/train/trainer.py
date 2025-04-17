@@ -17,6 +17,7 @@ import functools
 from wandb.sdk.wandb_run import Run
 from torch.utils.data import DataLoader
 import torch
+import wandb
 
 
 from jax.experimental import mesh_utils
@@ -354,6 +355,11 @@ class Trainer:
                         with open(params_path, "wb") as file:
                             checkpoint = jax.device_get(self.train_state)
                             pickle.dump(checkpoint, file)
+
+                        # Create and log as wandb artifact
+                        artifact = wandb.Artifact(f"state_{total_step}", type="model")
+                        artifact.add_file(params_path)
+                        self.run.log_artifact(artifact)
 
                     if self.run and self.registry_path and total_step % 300 == 0:
                         registry_path = self.registry_path
