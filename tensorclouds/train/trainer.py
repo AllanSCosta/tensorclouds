@@ -137,7 +137,7 @@ class Trainer:
                 dataset,
                 batch_size=self.batch_size,
                 num_workers=self.num_workers,
-                collate_fn=identity,
+                collate_fn=tree_stack,
                 shuffle=True,
             )
 
