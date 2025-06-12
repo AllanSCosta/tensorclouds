@@ -143,8 +143,10 @@ class Trainer:
 
         self.loaders = {
             'train': _make_loader(train_dataset),
-            'val': _make_loader(val_dataset) if val_dataset else None
         }
+
+        for val_name, val in val_dataset.items():
+            self.loaders[val_name] = _make_loader(val)
 
         self.train_only = train_only
         self.single_batch = single_batch
@@ -261,7 +263,7 @@ class Trainer:
 
         # reduce gradients
         grad = tree_map(lambda v: jnp.mean(v, axis=0), grad)
- m        grad = tree_map(lambda v: jnp.clip(v, -self.max_grad, self.max_grad), grad)
+        grad = tree_map(lambda v: jnp.clip(v, -self.max_grad, self.max_grad), grad)
 
         # get mean gradient norm for metrics
         mean_abs_grad = tree_map(lambda v: jnp.mean(jnp.linalg.norm(v)), grad)

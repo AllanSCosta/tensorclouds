@@ -16,6 +16,12 @@ class TensorCloud:
     mask_irreps_array: jax.Array
     coord: jax.Array
     mask_coord: jax.Array
+    label: jax.Array = None
+
+
+    @property
+    def shape(self):
+        return self.irreps_array.shape[:-1]
 
     @classmethod
     def empty(cls, irreps: e3nn.Irreps):
@@ -26,6 +32,24 @@ class TensorCloud:
             mask_irreps_array=np.zeros((0, irreps.num_irreps), dtype=bool),
             coord=np.zeros((0, 3)),
             mask_coord=np.zeros(0, dtype=bool),
+        )
+
+    @classmethod
+    def ones_like(cls, tc):
+        return cls(
+            irreps_array=e3nn.ones(tc.irreps_array.irreps),
+            mask_irreps_array=np.ones_like(tc.mask_irreps_array),
+            coord=np.ones_like(tc.coord),
+            mask_coord=np.ones_like(tc.mask_coord),
+        )
+
+    @classmethod
+    def zeros_like(cls, tc):
+        return cls(
+            irreps_array=e3nn.zeros(tc.irreps_array.irreps),
+            mask_irreps_array=np.zeros_like(tc.mask_irreps_array),
+            coord=np.zeros_like(tc.coord),
+            mask_coord=np.zeros_like(tc.mask_coord),
         )
 
     @property
@@ -45,6 +69,7 @@ class TensorCloud:
             mask_irreps_array=kwargs.get("mask_irreps_array", self.mask_irreps_array),
             coord=kwargs.get("coord", self.coord),
             mask_coord=kwargs.get("mask_coord", self.mask_coord),
+            label=kwargs.get("label", self.label),
         )
 
     @classmethod
@@ -61,7 +86,10 @@ class TensorCloud:
         )
         coord = jnp.concatenate([cloud.coord for cloud in clouds], axis=0)
         mask_coord = jnp.concatenate([cloud.mask_coord for cloud in clouds], axis=0)
-        return cls(irreps_array, mask_irreps_array, coord, mask_coord)
+
+        label = jnp.concatenate([cloud.label for cloud in clouds], axis=0)
+
+        return cls(irreps_array, mask_irreps_array, coord, mask_coord, label)
 
     @classmethod
     def zeros(cls, irreps: e3nn.Irreps, shape: tuple) -> "TensorCloud":
@@ -102,6 +130,7 @@ class TensorCloud:
                     mask_irreps_array=self.mask_irreps_array[start : start + piece],
                     coord=self.coord[start : start + piece],
                     mask_coord=self.mask_coord[start : start + piece],
+                    label=self.label[start : start + piece],
                 )
             )
             start += piece
@@ -160,6 +189,7 @@ class TensorCloud:
             mask_irreps_array=self.mask_irreps_array & other.mask_irreps_array,
             coord=self.coord + other.coord,
             mask_coord=self.mask_coord & other.mask_coord,
+            label=self.label,
         )
 
     def __radd__(self, other):
@@ -184,6 +214,7 @@ class TensorCloud:
             mask_irreps_array=self.mask_irreps_array,
             coord=scalar_coord * self.coord,
             mask_coord=self.mask_coord,
+            label=self.label,
         )
 
     def __neg__(self):
@@ -195,6 +226,25 @@ class TensorCloud:
             mask_irreps_array=self.mask_irreps_array,
             coord=self.coord / scalar,
             mask_coord=self.mask_coord,
+            label=self.label,
+        )
+
+    def __sub__(self, other: "TensorCloud") -> "TensorCloud":
+        return TensorCloud(
+            irreps_array=self.irreps_array - other.irreps_array,
+            mask_irreps_array=self.mask_irreps_array & other.mask_irreps_array,
+            coord=self.coord - other.coord,
+            mask_coord=self.mask_coord & other.mask_coord,
+            label=self.label,
+        )
+
+    def __rsub__(self, other: "TensorCloud") -> "TensorCloud":
+        return TensorCloud(
+            irreps_array=other.irreps_array - self.irreps_array,
+            mask_irreps_array=self.mask_irreps_array & other.mask_irreps_array,
+            coord=other.coord - self.coord,
+            mask_coord=self.mask_coord & other.mask_coord,
+            label=self.label,
         )
 
     def dot(self, other):
@@ -226,4 +276,106 @@ class TensorCloud:
             mask_irreps_array=self.mask_irreps_array[index],
             coord=self.coord[index],
             mask_coord=self.mask_coord[index],
+            label=self.label[index] if self.label is not None else None,
         )
+
+
+from typing import Dict
+
+@struct.dataclass
+class TensorClouds:
+
+    irreps: e3nn.Irreps
+    _tensorclouds: Dict[str, TensorCloud]
+
+    @classmethod
+    def create(cls, **kwargs):
+        _tensorclouds = kwargs
+        _tensorclouds = {k: v for k, v in _tensorclouds.items() if v is not None}
+        _tensorclouds = {k: v for k, v in _tensorclouds.items() if len(v) > 0}
+        
+        irreps = None
+        for k, v in _tensorclouds.items():
+            if not isinstance(v, TensorCloud):
+                raise ValueError(f"Expected TensorCloud for {k}, got {type(v)}")
+            irreps = v.irreps if irreps is None else irreps
+            assert v.irreps == irreps, f"All TensorClouds must have the same irreps, but got {v.irreps} and {irreps}"
+        irreps = irreps
+        return cls(irreps=irreps, _tensorclouds=_tensorclouds)
+    
+    def __len__(self):
+        return len(self._tensorclouds)
+    
+    def __getitem__(self, key):
+        return self._tensorclouds[key]
+    
+    def replace(self, **kwargs):
+        new_tensorclouds = self._tensorclouds.copy()
+        new_tensorclouds.update(kwargs)
+        return TensorClouds(**new_tensorclouds)
+    
+    def __repr__(self):
+        return f"TensorClouds({', '.join(f'{k}: {v.shape}' for k, v in self._tensorclouds.items())})"
+
+    def __rmul__(self, other):
+        # if isinstance(other, (int, float)):
+        return TensorClouds.create(**{k: v * other for k, v in self._tensorclouds.items()})
+        # else:
+            # raise ValueError(f"Cannot multiply {type(other)} with TensorClouds")
+        
+    def __mul__(self, other):
+        # if isinstance(other, (int, float)):
+        return self.__rmul__(other)
+        # else:
+            # raise ValueError(f"Cannot multiply {type(other)} with TensorClouds")
+    
+    def __add__(self, other):
+        if isinstance(other, TensorClouds):
+            return TensorClouds.create(**{k: v + other[k] for k, v in self._tensorclouds.items()})
+        else:
+            raise ValueError(f"Cannot add {type(other)} with TensorClouds")
+
+    def __radd__(self, other):
+        if isinstance(other, TensorClouds):
+            return self.__add__(other)
+        else:
+            raise ValueError(f"Cannot add {type(other)} with TensorClouds")
+
+    def __sub__(self, other):
+        if isinstance(other, TensorClouds):
+            return TensorClouds.create(**{k: v - other[k] for k, v in self._tensorclouds.items()})
+        else:
+            raise ValueError(f"Cannot subtract {type(other)} with TensorClouds")
+
+    def __rsub__(self, other):
+        if isinstance(other, TensorClouds):
+            return TensorClouds.create(**{k: other[k] - v for k, v in self._tensorclouds.items()})
+        else:
+            raise ValueError(f"Cannot subtract {type(other)} with TensorClouds")
+
+    def __div__(self, other):
+        if isinstance(other, (int, float)):
+            return TensorClouds.create(**{k: v / other for k, v in self._tensorclouds.items()})
+        else:
+            raise ValueError(f"Cannot divide {type(other)} with TensorClouds")
+
+    def __rdiv__(self, other):
+        if isinstance(other, (int, float)):
+            return TensorClouds.create(**{k: other / v for k, v in self._tensorclouds.items()})
+        else:
+            raise ValueError(f"Cannot divide {type(other)} with TensorClouds")
+    
+    @property
+    def shapes(self):
+        return {k: v.shape for k, v in self._tensorclouds.items()}
+
+    @property
+    def mask_coord(self):
+        return {k: v.mask_coord for k, v in self._tensorclouds.items()}
+    
+    @property
+    def mask_irreps_array(self):
+        return {k: v.mask_irreps_array for k, v in self._tensorclouds.items()}
+    
+    # def centralize(self,):
+
