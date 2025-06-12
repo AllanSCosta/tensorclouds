@@ -16,6 +16,13 @@ class TensorCloud:
     A TensorCloud is a collection of tensors with associated coordinates and masks.
     It is used to represent a cloud of tensors in a 3D space, where each tensor can have
     different irreducible representations (irreps).
+
+    Attributes:
+        irreps_array (e3nn.IrrepsArray): The array of tensors with their irreducible representations.
+        mask_irreps_array (jax.Array): A boolean mask indicating which irreps are present.
+        coord (jax.Array): The coordinates of the tensors in 3D space.
+        mask_coord (jax.Array): A boolean mask indicating which coordinates are valid.
+        label (jax.Array, optional): An optional label for the TensorCloud, e.g., for classification tasks.
     """
 
     irreps_array: e3nn.IrrepsArray
@@ -268,6 +275,12 @@ class TensorCloud:
         return features_dot, coord_dot
 
     def norm(self):
+        """
+        Compute the norm of the irreps_array and coord of the TensorCloud.
+        Returns:        
+            Tuple[jax.Array, jax.Array]: A tuple containing the norms of the irreps_array and coord.
+        """
+        
         mask_features = self.mask_irreps_array
         mask_coord = self.mask_coord
         features_norm = (mask_features * self.irreps_array).array ** 2
@@ -277,6 +290,13 @@ class TensorCloud:
         return features_norm, coord_norm
 
     def __getitem__(self, index: int) -> "TensorCloud":
+        """
+        Get a single TensorCloud from the collection by index.
+        Args:
+            index (int): The index of the TensorCloud to retrieve.
+        Returns:
+            TensorCloud: A new TensorCloud instance containing the data at the specified index.
+        """
         return TensorCloud(
             irreps_array=self.irreps_array[index],
             mask_irreps_array=self.mask_irreps_array[index],
