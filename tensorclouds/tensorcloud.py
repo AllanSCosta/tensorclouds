@@ -12,6 +12,12 @@ import py3Dmol
 @struct.dataclass
 class TensorCloud:
 
+    """
+    A TensorCloud is a collection of tensors with associated coordinates and masks.
+    It is used to represent a cloud of tensors in a 3D space, where each tensor can have
+    different irreducible representations (irreps).
+    """
+
     irreps_array: e3nn.IrrepsArray
     mask_irreps_array: jax.Array
     coord: jax.Array
