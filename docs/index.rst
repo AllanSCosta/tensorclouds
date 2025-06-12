@@ -1,8 +1,9 @@
 Getting Started
 =============
 
-`tensorclouds` is a Python package designed to simplify the process of building and training neural networks for 3D data through Euclidean Equivariant Neural Networks. 
-It provides user-friendly data classes and interfaces for defining and evaluating models.
+`tensorclouds` is a Python package for Euclidean Equivariant Neural Networks in Flax/JAX.
+It provides tools and modules for building and training E3NNs, and a zoo of pre-built models.
+
 
 .. toctree::
    :maxdepth: 4
