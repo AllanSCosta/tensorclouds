@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 from einops import rearrange, repeat
 
-from tensorclouds.train.schedulers import Scheduler
+# from tensorclouds.train.schedulers import Scheduler
 
 import e3nn_jax as e3nn
 import optax
@@ -18,7 +18,7 @@ from moleculib.assembly.datum import AssemblyDatum
 
 class LossFunction:
     def __init__(
-        self, weight: float = 1.0, start_step: int = 0, scheduler: Scheduler = None
+        self, weight: float = 1.0, start_step: int = 0, scheduler = None
     ):
         self.weight = weight
         self.start_step = start_step

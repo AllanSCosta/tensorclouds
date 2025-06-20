@@ -23,6 +23,7 @@ class TensorCloud:
         coord (jax.Array): The coordinates of the tensors in 3D space.
         mask_coord (jax.Array): A boolean mask indicating which coordinates are valid.
         label (jax.Array, optional): An optional label for the TensorCloud, e.g., for classification tasks.
+
     """
 
     irreps_array: e3nn.IrrepsArray

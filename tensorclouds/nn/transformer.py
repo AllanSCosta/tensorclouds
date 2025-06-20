@@ -5,33 +5,62 @@ import jax.numpy as jnp
 from ..tensorcloud import TensorCloud
 
 
-class FeedForward(nn.Module):
+from .attention import EquivariantSelfAttention
+from .feed_forward import FeedForward
+from .layer_norm import EquivariantLayerNorm
+
+
+class TransformerBlock(nn.Module):
 
     irreps: e3nn.Irreps
-    factor: int = 4
+    # k: int = 0
+    k_seq: int = 0
+    radial_cut: float = 24.0
+    radial_bins: int = 42
+    radial_basis: str = "gaussian"
+    move: bool = False
+    
+    @nn.compact
+    def __call__(self, x):
+        res = x
+
+        x = EquivariantSelfAttention(
+            irreps_out=self.irreps,
+            # k=self.k,
+            k_seq=self.k_seq,
+            radial_cut=self.radial_cut,
+            radial_bins=self.radial_bins,
+            radial_basis=self.radial_basis,
+            move=self.move,
+        )(x)
+
+        x = x.replace(
+            irreps_array=EquivariantLayerNorm()(res.irreps_array + x.irreps_array))
+        res = x
+
+        x = FeedForward(self.irreps, 4)(x)
+        x = x.replace(
+            irreps_array=EquivariantLayerNorm()(res.irreps_array + x.irreps_array))
+
+        return x
+    
+
+class Transformer(nn.Module):
+    
+    irreps: e3nn.Irreps
+    depth: int
+
+    k_seq: int = 16
+    radial_cut: float = 24.0
+    move: bool = False
 
     @nn.compact
-    def __call__(self, state: TensorCloud) -> TensorCloud:
-        features = res = state.irreps_array
-
-        features = e3nn.flax.Linear(self.factor * self.irreps)(features)
-        
-        gate_ = []
-        for (_, ir), x in zip(features.irreps, features.list):
-            norms_sqr = jnp.sum(x**2, axis=-1)
-            norms_ = jnp.sqrt(jnp.where(norms_sqr == 0.0, 1.0, norms_sqr))
-            norms_ = jnp.where(norms_sqr == 0.0, 0.0, norms_)
-            gate = e3nn.flax.MultiLayerPerceptron([norms_.shape[-1]], act=jax.nn.sigmoid)(norms_)
-            gate_.append(gate)
-        gate = jnp.concatenate(gate_, axis=-1)
-        features = (gate * features)
-
-
-
-        features = e3nn.flax.Linear(self.irreps)(features)
-
-        return state.replace(
-            irreps_array=features,
-            # mask_irreps_array=jnp.ones_like(gate).astype(jnp.bool_),
-        )
-
+    def __call__(self, x):
+        for _ in range(self.depth):
+            x = TransformerBlock(
+                irreps=self.irreps,
+                k_seq=self.k_seq,
+                radial_cut=self.radial_cut,
+                move=self.move,
+            )(x)
+        return x

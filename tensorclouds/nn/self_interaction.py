@@ -2,6 +2,9 @@
 from ..tensorcloud import TensorCloud
 import e3nn_jax as e3nn
 from .layer_norm import EquivariantLayerNorm
+import jax
+import flax.linen as nn
+
 
 class FullTensorSquareSelfInteraction(nn.Module):
 
@@ -92,7 +95,7 @@ class SelfInteraction(nn.Module):
     depth: int = 1
     norm_last: bool = True
 
-    base: nn.Module = FeedForward
+    base: nn.Module = SegmentedTensorSquareSelfInteraction
 
     @nn.compact
     def __call__(self, state: TensorCloud) -> TensorCloud:

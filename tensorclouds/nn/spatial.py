@@ -65,7 +65,6 @@ class CompleteSpatialConvolution(nn.Module):
         # Angular embedding:
         # edge_irreps = [ irrep for (mul, irrep) in self.edge_irreps ]
         # edge_irreps = e3nn.Irreps(edge_irreps)
-
         ang_embed = e3nn.spherical_harmonics(
             self.edge_irreps, vectors, False, "component"
         )
