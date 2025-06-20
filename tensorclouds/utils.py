@@ -4,6 +4,7 @@ from flax import linen as nn
 from typing import Tuple
 import e3nn_jax as e3nn
 
+
 def compute_rotation_for_alignment(x: TensorCloud, y: TensorCloud):
     """Computes the rotation matrix that aligns two point clouds."""
 

@@ -17,9 +17,7 @@ from moleculib.assembly.datum import AssemblyDatum
 
 
 class LossFunction:
-    def __init__(
-        self, weight: float = 1.0, start_step: int = 0, scheduler = None
-    ):
+    def __init__(self, weight: float = 1.0, start_step: int = 0, scheduler=None):
         self.weight = weight
         self.start_step = start_step
         self.scheduler = scheduler
@@ -67,8 +65,6 @@ class LossPipe:
             loss += loss_fn_loss
             metrics.update(loss_fn_metrics)
         return model_output, loss, metrics
-
-
 
 
 class VectorCloudMatchingLoss(LossFunction):
@@ -131,8 +127,6 @@ class VectorCloudMatchingLoss(LossFunction):
             vectors_loss + coord_loss,
             {"vectors_loss": vectors_loss, "coord_loss": coord_loss},
         )
-
-
 
 
 class InternalVectorLoss(LossFunction):

@@ -53,7 +53,7 @@ class NormalDistribution:
         )
         coords = jax.random.normal(coords_key, (*leading_shape, 3)) * self.coords_scale
         # mask_features_arr = (e3nn.ones(self.irreps_in, leading_shape) * mask_features[..., None]).array
-        
+
         mask_features_arr = (e3nn.ones(self.irreps_in) * mask_features).array
         coords = mask_coord[..., None] * coords
         irreps = e3nn.IrrepsArray(
@@ -102,9 +102,11 @@ class NormalDistribution:
                 e3nn.normal(self.irreps_in, leading_shape=leading_shape, key=irreps_key)
                 * self.irreps_scale
             )
-            coords = jax.random.normal(coords_key, (*leading_shape, 3)) * self.coords_scale
+            coords = (
+                jax.random.normal(coords_key, (*leading_shape, 3)) * self.coords_scale
+            )
             # mask_features_arr = (e3nn.ones(self.irreps_in, leading_shape) * mask_features[..., None]).array
-            
+
             mask_features_arr = (e3nn.ones(self.irreps_in) * mask_features).array
             coords = mask_coord[..., None] * coords
             irreps = e3nn.IrrepsArray(
@@ -112,18 +114,17 @@ class NormalDistribution:
                 mask_features_arr * irreps.array,
             )
             tcs.append(
-                (   attr, 
+                (
+                    attr,
                     TensorCloud(
                         irreps_array=irreps,
                         mask_irreps_array=mask_features,
                         coord=coords,
                         mask_coord=mask_coord,
-                    )
+                    ),
                 )
             )
         return TensorClouds.create(**dict(tcs))
-
-
 
     def log_likelihood(self, x: TensorCloud) -> chex.Array:
         """Compute the log probability of the input."""
@@ -134,5 +135,3 @@ class NormalDistribution:
             x.coord, loc=self.coords_mean, scale=self.coords_scale
         ).sum(-1)
         return irreps_log_likelihood + coords_log_likelihood
-
-

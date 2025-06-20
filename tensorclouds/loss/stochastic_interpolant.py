@@ -1,4 +1,3 @@
-
 class StochasticInterpolantLoss(LossFunction):
 
     def _call(self, _, model_output: ModelOutput, __: ProteinDatum):
@@ -10,7 +9,7 @@ class StochasticInterpolantLoss(LossFunction):
                 name = re.sub(r"(?<!^)(?=[A-Z])", "_", type(output).__name__).lower()
                 aggr_loss += loss_
                 for key, value in metrics_.items():
-                    metrics[name + '_' + key] = value
+                    metrics[name + "_" + key] = value
             return model_output, aggr_loss, metrics
 
         pred = model_output.prediction
@@ -30,4 +29,8 @@ class StochasticInterpolantLoss(LossFunction):
 
         features_loss, coord_loss = stochastic_interpolant_loss(pred, -target)
 
-        return model_output, features_loss + coord_loss, { 'features_loss': features_loss, 'coord_loss': coord_loss }
+        return (
+            model_output,
+            features_loss + coord_loss,
+            {"features_loss": features_loss, "coord_loss": coord_loss},
+        )

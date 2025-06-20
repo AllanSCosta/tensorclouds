@@ -11,7 +11,6 @@ import py3Dmol
 
 @struct.dataclass
 class TensorCloud:
-
     """
     A TensorCloud is a collection of tensors with associated coordinates and masks.
     It is used to represent a cloud of tensors in a 3D space, where each tensor can have
@@ -31,7 +30,6 @@ class TensorCloud:
     coord: jax.Array
     mask_coord: jax.Array
     label: jax.Array = None
-
 
     @property
     def shape(self):
@@ -278,10 +276,10 @@ class TensorCloud:
     def norm(self):
         """
         Compute the norm of the irreps_array and coord of the TensorCloud.
-        Returns:        
+        Returns:
             Tuple[jax.Array, jax.Array]: A tuple containing the norms of the irreps_array and coord.
         """
-        
+
         mask_features = self.mask_irreps_array
         mask_coord = self.mask_coord
         features_norm = (mask_features * self.irreps_array).array ** 2
@@ -309,6 +307,7 @@ class TensorCloud:
 
 from typing import Dict
 
+
 @struct.dataclass
 class TensorClouds:
 
@@ -320,45 +319,51 @@ class TensorClouds:
         _tensorclouds = kwargs
         _tensorclouds = {k: v for k, v in _tensorclouds.items() if v is not None}
         _tensorclouds = {k: v for k, v in _tensorclouds.items() if len(v) > 0}
-        
+
         irreps = None
         for k, v in _tensorclouds.items():
             if not isinstance(v, TensorCloud):
                 raise ValueError(f"Expected TensorCloud for {k}, got {type(v)}")
             irreps = v.irreps if irreps is None else irreps
-            assert v.irreps == irreps, f"All TensorClouds must have the same irreps, but got {v.irreps} and {irreps}"
+            assert (
+                v.irreps == irreps
+            ), f"All TensorClouds must have the same irreps, but got {v.irreps} and {irreps}"
         irreps = irreps
         return cls(irreps=irreps, _tensorclouds=_tensorclouds)
-    
+
     def __len__(self):
         return len(self._tensorclouds)
-    
+
     def __getitem__(self, key):
         return self._tensorclouds[key]
-    
+
     def replace(self, **kwargs):
         new_tensorclouds = self._tensorclouds.copy()
         new_tensorclouds.update(kwargs)
         return TensorClouds(**new_tensorclouds)
-    
+
     def __repr__(self):
         return f"TensorClouds({', '.join(f'{k}: {v.shape}' for k, v in self._tensorclouds.items())})"
 
     def __rmul__(self, other):
         # if isinstance(other, (int, float)):
-        return TensorClouds.create(**{k: v * other for k, v in self._tensorclouds.items()})
+        return TensorClouds.create(
+            **{k: v * other for k, v in self._tensorclouds.items()}
+        )
         # else:
-            # raise ValueError(f"Cannot multiply {type(other)} with TensorClouds")
-        
+        # raise ValueError(f"Cannot multiply {type(other)} with TensorClouds")
+
     def __mul__(self, other):
         # if isinstance(other, (int, float)):
         return self.__rmul__(other)
         # else:
-            # raise ValueError(f"Cannot multiply {type(other)} with TensorClouds")
-    
+        # raise ValueError(f"Cannot multiply {type(other)} with TensorClouds")
+
     def __add__(self, other):
         if isinstance(other, TensorClouds):
-            return TensorClouds.create(**{k: v + other[k] for k, v in self._tensorclouds.items()})
+            return TensorClouds.create(
+                **{k: v + other[k] for k, v in self._tensorclouds.items()}
+            )
         else:
             raise ValueError(f"Cannot add {type(other)} with TensorClouds")
 
@@ -370,28 +375,36 @@ class TensorClouds:
 
     def __sub__(self, other):
         if isinstance(other, TensorClouds):
-            return TensorClouds.create(**{k: v - other[k] for k, v in self._tensorclouds.items()})
+            return TensorClouds.create(
+                **{k: v - other[k] for k, v in self._tensorclouds.items()}
+            )
         else:
             raise ValueError(f"Cannot subtract {type(other)} with TensorClouds")
 
     def __rsub__(self, other):
         if isinstance(other, TensorClouds):
-            return TensorClouds.create(**{k: other[k] - v for k, v in self._tensorclouds.items()})
+            return TensorClouds.create(
+                **{k: other[k] - v for k, v in self._tensorclouds.items()}
+            )
         else:
             raise ValueError(f"Cannot subtract {type(other)} with TensorClouds")
 
     def __div__(self, other):
         if isinstance(other, (int, float)):
-            return TensorClouds.create(**{k: v / other for k, v in self._tensorclouds.items()})
+            return TensorClouds.create(
+                **{k: v / other for k, v in self._tensorclouds.items()}
+            )
         else:
             raise ValueError(f"Cannot divide {type(other)} with TensorClouds")
 
     def __rdiv__(self, other):
         if isinstance(other, (int, float)):
-            return TensorClouds.create(**{k: other / v for k, v in self._tensorclouds.items()})
+            return TensorClouds.create(
+                **{k: other / v for k, v in self._tensorclouds.items()}
+            )
         else:
             raise ValueError(f"Cannot divide {type(other)} with TensorClouds")
-    
+
     @property
     def shapes(self):
         return {k: v.shape for k, v in self._tensorclouds.items()}
@@ -399,10 +412,9 @@ class TensorClouds:
     @property
     def mask_coord(self):
         return {k: v.mask_coord for k, v in self._tensorclouds.items()}
-    
+
     @property
     def mask_irreps_array(self):
         return {k: v.mask_irreps_array for k, v in self._tensorclouds.items()}
-    
-    # def centralize(self,):
 
+    # def centralize(self,):

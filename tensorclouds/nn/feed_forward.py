@@ -19,11 +19,13 @@ class FeedForward(nn.Module):
             expansion_irreps,
             parameter_initializer=jax.nn.initializers.he_normal,
         )(features)
-        
-        features = e3nn.norm_activation(features, [jax.nn.silu, jnp.tanh], normalization='norm')
+
+        features = e3nn.norm_activation(
+            features, [jax.nn.silu, jnp.tanh], normalization="norm"
+        )
 
         features = e3nn.flax.Linear(
-            self.irreps, 
+            self.irreps,
             parameter_initializer=jax.nn.initializers.he_normal,
         )(features)
 

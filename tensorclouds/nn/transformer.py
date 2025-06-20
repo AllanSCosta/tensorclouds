@@ -19,9 +19,9 @@ class TransformerBlock(nn.Module):
     radial_bins: int = 42
     radial_basis: str = "gaussian"
     move: bool = False
-    
+
     @nn.compact
-    def __call__(self, x):
+    def __call__(self, x: TensorCloud) -> TensorCloud:
         res = x
 
         x = EquivariantSelfAttention(
@@ -35,18 +35,20 @@ class TransformerBlock(nn.Module):
         )(x)
 
         x = x.replace(
-            irreps_array=EquivariantLayerNorm()(res.irreps_array + x.irreps_array))
+            irreps_array=EquivariantLayerNorm()(res.irreps_array + x.irreps_array)
+        )
         res = x
 
         x = FeedForward(self.irreps, 4)(x)
         x = x.replace(
-            irreps_array=EquivariantLayerNorm()(res.irreps_array + x.irreps_array))
+            irreps_array=EquivariantLayerNorm()(res.irreps_array + x.irreps_array)
+        )
 
         return x
-    
+
 
 class Transformer(nn.Module):
-    
+
     irreps: e3nn.Irreps
     depth: int
 
@@ -55,7 +57,7 @@ class Transformer(nn.Module):
     move: bool = False
 
     @nn.compact
-    def __call__(self, x):
+    def __call__(self, x: TensorCloud) -> TensorCloud:
         for _ in range(self.depth):
             x = TransformerBlock(
                 irreps=self.irreps,

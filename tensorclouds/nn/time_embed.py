@@ -1,4 +1,3 @@
-
 from typing import Tuple
 import flax.linen as nn
 from tensorclouds.tensorcloud import TensorCloud

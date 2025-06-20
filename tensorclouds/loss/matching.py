@@ -1,4 +1,3 @@
-
 class TensorCloudMatchingLoss(LossFunction):
 
     def _call(
@@ -29,10 +28,13 @@ class TensorCloudMatchingLoss(LossFunction):
         features_loss = jnp.square(pred.irreps_array.array - target.irreps_array.array)
         features_loss = reweight * features_loss
 
-        features_mask = (target.mask_irreps_array * e3nn.ones(target.irreps_array.irreps, target.irreps_array.shape[:-1])).array
+        features_mask = (
+            target.mask_irreps_array
+            * e3nn.ones(target.irreps_array.irreps, target.irreps_array.shape[:-1])
+        ).array
         features_loss = jnp.sum(features_loss * features_mask)
 
-        if reduction == 'mean':
+        if reduction == "mean":
             features_loss = features_loss / (jnp.sum(features_mask) + 1e-6)
 
         features_pred_norm = jnp.square(pred.irreps_array.array).sum(-1)
@@ -45,7 +47,7 @@ class TensorCloudMatchingLoss(LossFunction):
         coord_loss = reweight * coord_loss
         coord_loss = jnp.sum(coord_loss * target.mask_coord[..., None])
 
-        if reduction == 'mean':
+        if reduction == "mean":
             coord_loss = coord_loss / (jnp.sum(target.mask_coord) + 1e-6)
 
         metrics = dict(

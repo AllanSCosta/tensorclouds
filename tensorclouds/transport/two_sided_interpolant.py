@@ -27,7 +27,7 @@ class DriftPrediction:
 
 class TensorCloudTwoSidedInterpolant(nn.Module):
 
-    network: nn.Module # must output two tensorclouds
+    network: nn.Module  # must output two tensorclouds
     leading_shape: Tuple[int]
     var_features: float = 1.0
     var_coords: float = 1.0
@@ -141,4 +141,3 @@ class TensorCloudTwoSidedInterpolant(nn.Module):
             NoisePrediction(prediction=noise_pred, target=z),
             DriftPrediction(prediction=drift_pred, target=drift),
         )
-

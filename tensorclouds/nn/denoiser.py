@@ -16,6 +16,7 @@ import einops as ein
 
 from .time_embed import OnehotTimeEmbed
 
+
 class Denoiser(nn.Module):
 
     layers: Tuple[e3nn.Irreps]
@@ -29,13 +30,13 @@ class Denoiser(nn.Module):
 
     @nn.compact
     def __call__(self, x, t=None, cond=None):
-        
-        # concatenate cond 
+
+        # concatenate cond
         if cond is not None:
             x = x.replace(
                 irreps_array=e3nn.concatenate([x.irreps_array, cond], axis=-1).regroup()
             )
-        
+
         # first mix with full square
         x = SelfInteraction(
             [self.layers[0]],
@@ -43,22 +44,18 @@ class Denoiser(nn.Module):
             norm_last=False,
         )(x)
 
-
         # concatenate position
         if self.pos_encoding:
             pos = nn.Embed(
-                num_embeddings=x.irreps_array.shape[0], 
-                features=x.irreps_array.filter('0e').shape[-1]
+                num_embeddings=x.irreps_array.shape[0],
+                features=x.irreps_array.filter("0e").shape[-1],
             )(jnp.arange(x.irreps_array.shape[0]))
 
-            pos = e3nn.IrrepsArray(
-                f"{x.irreps_array.filter('0e').shape[-1]}x0e", pos
-            )
+            pos = e3nn.IrrepsArray(f"{x.irreps_array.filter('0e').shape[-1]}x0e", pos)
 
             x = x.replace(
-                irreps_array=e3nn.concatenate((
-                    x.irreps_array, pos
-                ), axis=-1).regroup() * x.mask_coord[..., None]
+                irreps_array=e3nn.concatenate((x.irreps_array, pos), axis=-1).regroup()
+                * x.mask_coord[..., None]
             )
 
         # concatenate time
@@ -159,7 +156,7 @@ class TwoTrackDenoiser(nn.Module):
         cond=None,
     ):
         pred_feature = self.feature_net(x, t, cond=cond).irreps_array
-        pred_coord = self.coord_net(x, t, cond=cond).coord        
+        pred_coord = self.coord_net(x, t, cond=cond).coord
         feature_mask = e3nn.IrrepsArray(
             f"{x.irreps_array.irreps.num_irreps}x0e", x.mask_irreps_array
         )

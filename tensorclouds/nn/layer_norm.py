@@ -3,6 +3,7 @@ from flax import linen as nn
 import jax.numpy as jnp
 import jax
 
+
 class EquivariantLayerNorm(nn.Module):
     @nn.compact
     def __call__(self, input: e3nn.IrrepsArray) -> e3nn.IrrepsArray:

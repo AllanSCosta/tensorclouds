@@ -12,9 +12,9 @@ from ..tensorcloud import TensorCloud
 
 from einops import rearrange, repeat
 from moleculib.nucleic.alphabet import (
-    all_nucs, #all_residues,
-    all_nucs_atom_mask, # all_residues_atom_mask,
-    all_nucs_atom_tokens, # all_residues_atom_tokens,
+    all_nucs,  # all_residues,
+    all_nucs_atom_mask,  # all_residues_atom_mask,
+    all_nucs_atom_tokens,  # all_residues_atom_tokens,
     # flippable_arr,
     # flippable_mask,
 )
@@ -23,21 +23,22 @@ from jax import tree_util
 from moleculib.nucleic.datum import NucleicDatum
 
 
-
 def nuc_to_tensor_cloud(nuc):
     res_token = nuc["nuc_token"]
-    res_mask = nuc["atom_mask"][..., 8] ##TODO: Do we want it to be atom mask or res mask??...
+    res_mask = nuc["atom_mask"][
+        ..., 8
+    ]  ##TODO: Do we want it to be atom mask or res mask??...
 
     scalars = jax.nn.one_hot(res_token, 14)
     scalars = scalars * res_mask[..., None]
 
     mask = nuc["atom_mask"]
-    #the ca coord must be present for the atoms in the residue to be available
-    #so if the c5' coord is masked, the entire nucleotide is masked:
-    mask = mask & res_mask[:, None] 
-    
+    # the ca coord must be present for the atoms in the residue to be available
+    # so if the c5' coord is masked, the entire nucleotide is masked:
+    mask = mask & res_mask[:, None]
+
     vectors = nuc["atom_coord"]
-    ca_coord = vectors[..., 8, :] #taking C5' atom as center
+    ca_coord = vectors[..., 8, :]  # taking C5' atom as center
     vectors = vectors - ca_coord[..., None, :]
     vectors = vectors * mask[..., None]
     vectors = rearrange(vectors, "r a c -> r (a c)")
@@ -46,11 +47,10 @@ def nuc_to_tensor_cloud(nuc):
         "14x0e + 24x1e", jnp.concatenate([scalars, vectors], axis=-1)
     )
 
-
     state = TensorCloud(
-        irreps_array=irreps_array, #TODO:  check if we want irreps_array * ca_mask[..., None],
+        irreps_array=irreps_array,  # TODO:  check if we want irreps_array * ca_mask[..., None],
         mask_irreps_array=mask,
-        coord=ca_coord,  #TODO:  check if we want ca_coord * ca_mask[..., None],
+        coord=ca_coord,  # TODO:  check if we want ca_coord * ca_mask[..., None],
         mask_coord=res_mask,
     ).centralize()
 
@@ -62,15 +62,15 @@ def tensor_cloud_to_nuc(state, nuc=None, backbone_only=False):
     ca_coord = state.coord
     res_mask = state.mask_coord
 
-# Depending on the irreps configuration, different processing paths are taken:
+    # Depending on the irreps configuration, different processing paths are taken:
     if str(irreps_array.irreps) == "14x0e+24x1e":
-        #Directly filter out scalar features (0e irreps) and converting the scalars into prob distribution
+        # Directly filter out scalar features (0e irreps) and converting the scalars into prob distribution
         res_logits = jax.nn.softmax(irreps_array.filter("0e").array)
         eos_logits = None
-    elif str(irreps_array.irreps) == "24x1e":# no scalar in this config
+    elif str(irreps_array.irreps) == "24x1e":  # no scalar in this config
         res_logits = None
         eos_logits = None
-    # else:  
+    # else:
     #     # TODO: When do we use it? cuz like the logits are not taken anywhere
     #     # Filter to keep scalar irreps and apply a MultiLayerPerceptron to obtain logits
     #     invariants = irreps_array.filter(keep="0e")
@@ -80,12 +80,12 @@ def tensor_cloud_to_nuc(state, nuc=None, backbone_only=False):
     #         output_activation=False,
     #     )(invariants).array
 
-        # res_logits, sos_logits, eos_logits = (
-        #     logits[..., :14],
-        #     logits[..., -1], #TODO: why -1 and -2?
-        #     logits[..., -2],
-        # )
-        # irreps_array = e3nn.haiku.Linear("24x1e")(irreps_array)
+    # res_logits, sos_logits, eos_logits = (
+    #     logits[..., :14],
+    #     logits[..., -1], #TODO: why -1 and -2?
+    #     logits[..., -2],
+    # )
+    # irreps_array = e3nn.haiku.Linear("24x1e")(irreps_array)
 
     atom_coord = irreps_array.filter("1e").array
     atom_coord = rearrange(atom_coord, "r (a c) -> r a c", a=24)
@@ -93,7 +93,9 @@ def tensor_cloud_to_nuc(state, nuc=None, backbone_only=False):
     if nuc is None and not backbone_only:
         sequence_token = jnp.argmax(res_logits, axis=-1)
     elif nuc is None and backbone_only:
-        sequence_token = jnp.full(res_logits.shape[0], all_nucs.index("G")) #NOTE changed to G but i think its completely irrelevant to mine
+        sequence_token = jnp.full(
+            res_logits.shape[0], all_nucs.index("G")
+        )  # NOTE changed to G but i think its completely irrelevant to mine
     else:
         sequence_token = nuc["nuc_token"]
 

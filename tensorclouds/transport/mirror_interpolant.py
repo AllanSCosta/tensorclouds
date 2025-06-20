@@ -102,7 +102,4 @@ class TensorCloudMirrorInterpolant(nn.Module):
         xt, z = self.compute_xt(t, x0)
         pred = self.network(xt, t, cond=cond)
 
-        return ModelPrediction(
-            prediction=pred,
-            target=z
-        )
+        return ModelPrediction(prediction=pred, target=z)

@@ -178,7 +178,7 @@ class TensorCloudDiffuser(nn.Module):
         self, x0: TensorCloud, cond: e3nn.IrrepsArray = None, is_training=False
     ):
         t = jax.random.randint(self.make_rng(), (), 0, self.timesteps)
-        
+
         x0 = x0.centralize()
         xt, z = self.q_sample(x0, t)
         ẑ = self.network(xt, t, cond=cond)

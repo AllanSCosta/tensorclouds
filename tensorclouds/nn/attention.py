@@ -1,4 +1,3 @@
-
 import jax
 import flax.linen as nn
 from ..tensorcloud import TensorCloud
@@ -30,7 +29,7 @@ class EquivariantSelfAttention(nn.Module):
         seq_len = state.irreps_array.shape[0]
         assert state.mask.shape == (seq_len,)
         assert state.coord.shape == (seq_len, 3)
-        
+
         features, coord = state.irreps_array, state.coord
 
         q = e3nn.flax.Linear(features.irreps)(features).mul_to_axis(self.num_heads)
@@ -52,17 +51,20 @@ class EquivariantSelfAttention(nn.Module):
         vectors = (coord_i - coord_j) * cross_mask[..., None]
         norm_sqr = jnp.sum(vectors**2, axis=-1)
         norm = jnp.where(
-            norm_sqr == 0.0, 0.0,
-            jnp.sqrt(jnp.where(norm_sqr == 0.0, 1.0, norm_sqr))
+            norm_sqr == 0.0, 0.0, jnp.sqrt(jnp.where(norm_sqr == 0.0, 1.0, norm_sqr))
         )
 
-        ang_embed = e3nn.spherical_harmonics(self.edge_irreps, vectors, True, "component")
+        ang_embed = e3nn.spherical_harmonics(
+            self.edge_irreps, vectors, True, "component"
+        )
         ang_embed = ang_embed * cross_mask[..., None].astype(ang_embed.array.dtype)
-        
+
         # q = q + e3nn.flax.Linear(features.irreps)(ang_embed).mul_to_axis(self.num_heads)
         # k = k + e3nn.flax.Linear(features.irreps)(ang_embed).mul_to_axis(self.num_heads)
         # v = v + e3nn.flax.Linear(features.irreps)(ang_embed).mul_to_axis(self.num_heads)
-        ang_embed = e3nn.flax.Linear(self.num_heads * ang_embed.irreps)(ang_embed).mul_to_axis(self.num_heads)
+        ang_embed = e3nn.flax.Linear(self.num_heads * ang_embed.irreps)(
+            ang_embed
+        ).mul_to_axis(self.num_heads)
         v = e3nn.concatenate((v, ang_embed), axis=-1).regroup()
 
         irreps_in = features.irreps
@@ -70,15 +72,13 @@ class EquivariantSelfAttention(nn.Module):
         score = jnp.where(cross_mask[..., None], score, -jnp.inf)
 
         # bias attention weights based on invariants
-        rad_embed = (
-            e3nn.soft_one_hot_linspace(
-                norm,
-                start=0.0,
-                end=self.radial_cut,
-                number=self.radial_bins,
-                basis=self.radial_basis,
-                cutoff=True,
-            )
+        rad_embed = e3nn.soft_one_hot_linspace(
+            norm,
+            start=0.0,
+            end=self.radial_cut,
+            number=self.radial_bins,
+            basis=self.radial_basis,
+            cutoff=True,
         )
 
         seq_pos_i = repeat(jnp.arange(seq_len), "i -> i j", j=seq_len)
@@ -93,22 +93,25 @@ class EquivariantSelfAttention(nn.Module):
         relative_seq_pos = jnp.where(cross_mask, relative_seq_pos, 0)
 
         relative_seq_pos = relative_seq_pos + k_seq
-        relative_seq_pos = nn.Embed(num_embeddings=2 * k_seq + 1, features=self.radial_bins)(
-            relative_seq_pos
-        )
+        relative_seq_pos = nn.Embed(
+            num_embeddings=2 * k_seq + 1, features=self.radial_bins
+        )(relative_seq_pos)
 
         invariants = e3nn.concatenate([relative_seq_pos, rad_embed], axis=-1).regroup()
-        attention_bias = e3nn.flax.MultiLayerPerceptron(
-            [score.shape[-1]],
-            self.activation,
-            with_bias=True,
-            output_activation=True,
-        )(invariants) * cross_mask[..., None]
-        
+        attention_bias = (
+            e3nn.flax.MultiLayerPerceptron(
+                [score.shape[-1]],
+                self.activation,
+                with_bias=True,
+                output_activation=True,
+            )(invariants)
+            * cross_mask[..., None]
+        )
+
         score = score + attention_bias.array
         attention_weights = jax.nn.softmax(score, where=cross_mask[..., None], axis=1)
-        
-        messages = (attention_weights[..., None] * v)
+
+        messages = attention_weights[..., None] * v
         messages = e3nn.IrrepsArray(messages.irreps, messages.array.sum(-3))
 
         messages = messages.axis_to_mul()
@@ -120,7 +123,7 @@ class EquivariantSelfAttention(nn.Module):
             state = state.replace(coord=new_coord)
 
         return state.replace(irreps_array=new_features)
-    
+
 
 def knn(coord: jax.Array, mask: jax.Array, k: int, k_seq: int = None):
     n, d = coord.shape
@@ -154,7 +157,6 @@ def knn(coord: jax.Array, mask: jax.Array, k: int, k_seq: int = None):
     assert mask.shape == (n, k)
 
     return neighbors, mask
-
 
 
 # class kNNWindow(nn.Module):
@@ -250,11 +252,10 @@ def knn(coord: jax.Array, mask: jax.Array, k: int, k_seq: int = None):
 #         relative_seq_pos = nn.Embed(num_embeddings=2 * k_seq + 1, features=32)(
 #             relative_seq_pos
 #         )
-            
-#         return self.convolve( 
-#             features_i, features_j, 
+
+#         return self.convolve(
+#             features_i, features_j,
 #             coord_i, coord_j, cross_mask,
 #             ang_embed, rad_embed,
 #             relative_seq_pos,
 #         )
-

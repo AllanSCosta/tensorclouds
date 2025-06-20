@@ -25,7 +25,6 @@ class ModelPrediction:
 from typing import Tuple
 
 
-
 class TensorCloudFlowMatcher(nn.Module):
 
     network: nn.Module
@@ -48,7 +47,6 @@ class TensorCloudFlowMatcher(nn.Module):
         #     var_features=self.var_features,
         #     N = leading_shape[-1],
         # )
-    
 
     def sample(
         self,
@@ -58,9 +56,11 @@ class TensorCloudFlowMatcher(nn.Module):
         mask_coord: jnp.array = None,
     ):
         dt = 1 / num_steps
-      
-        def update_one_step(network: nn.Module, xt: TensorCloud, t: float) -> TensorCloud:
-            v̂t = network(xt, t, cond=cond) 
+
+        def update_one_step(
+            network: nn.Module, xt: TensorCloud, t: float
+        ) -> TensorCloud:
+            v̂t = network(xt, t, cond=cond)
             next_xt = xt + dt * v̂t
             return next_xt, next_xt
 
@@ -89,9 +89,9 @@ class TensorCloudFlowMatcher(nn.Module):
         x0 = x0.centralize()
         x0, x1 = align_with_rotation(x0, x1)
         xt = t * x1 + (1 - t) * x0
-        vt = (x1 + (-x0))
+        vt = x1 + (-x0)
         return xt, vt
-    
+
     def __call__(
         self, x1: TensorCloud, cond: e3nn.IrrepsArray = None, is_training=False
     ):

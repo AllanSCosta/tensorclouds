@@ -136,6 +136,7 @@ import pickle
 
 from moleculib.abstract.dataset import PreProcessedDataset
 
+
 class EmbeddingsDataset(PreProcessedDataset):
 
     def __init__(self, path, transform=[]):
