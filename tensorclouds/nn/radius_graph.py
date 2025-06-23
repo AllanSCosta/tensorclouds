@@ -2,8 +2,8 @@ from typing import Tuple
 
 import jax
 import jax.numpy as jnp
-from matscipy.neighbours import neighbour_list
 import numpy as np
+from matscipy.neighbours import neighbour_list
 
 from ..tensorcloud import TensorCloud
 

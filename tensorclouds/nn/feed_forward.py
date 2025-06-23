@@ -1,7 +1,8 @@
+import e3nn_jax as e3nn
 import jax
 import jax.numpy as jnp
-import e3nn_jax as e3nn
 from flax import linen as nn
+
 from ..tensorcloud import TensorCloud
 
 

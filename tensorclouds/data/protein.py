@@ -1,10 +1,8 @@
 from functools import partial
 
+import e3nn_jax as e3nn
 import jax
 import jax.numpy as jnp
-import e3nn_jax as e3nn
-from ..tensorcloud import TensorCloud
-
 from einops import rearrange, repeat
 from moleculib.protein.alphabet import (
     all_residues,
@@ -13,9 +11,9 @@ from moleculib.protein.alphabet import (
     flippable_arr,
     flippable_mask,
 )
-
-
 from moleculib.protein.datum import ProteinDatum
+
+from ..tensorcloud import TensorCloud
 
 
 def protein_to_tensor_cloud(protein):

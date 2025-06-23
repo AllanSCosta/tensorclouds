@@ -1,23 +1,20 @@
 import functools
+from typing import List, Tuple
+
+import e3nn_jax as e3nn
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
 
-import e3nn_jax as e3nn
 from tensorclouds.random.normal import NormalDistribution
+
 from ..tensorcloud import TensorCloud
-
-from typing import List, Tuple
-
 
 # ==========================
 # ADAPTED BY ALLAN COSTA
 # ORIGINAL AUTHOR OF THE SNIPPET: lucidrains
 # github.com/lucidrains/denoising-diffusion-pytorch/
 # ==========================
-
-import jax
-import jax.numpy as jnp
 
 
 def linear_beta_schedule(timesteps):

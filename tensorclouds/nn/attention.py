@@ -1,12 +1,12 @@
-import jax
-import flax.linen as nn
-from ..tensorcloud import TensorCloud
-from einops import repeat
-import e3nn_jax as e3nn
-
 from typing import Callable
 
+import e3nn_jax as e3nn
+import flax.linen as nn
+import jax
 import jax.numpy as jnp
+from einops import repeat
+
+from ..tensorcloud import TensorCloud
 
 
 class EquivariantSelfAttention(nn.Module):
@@ -123,4 +123,3 @@ class EquivariantSelfAttention(nn.Module):
             state = state.replace(coord=new_coord)
 
         return state.replace(irreps_array=new_features)
-

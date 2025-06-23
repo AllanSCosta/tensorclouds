@@ -1,15 +1,12 @@
 from typing import List, Tuple, Union
 
-import numpy as np
-
 import chex
 import e3nn_jax as e3nn
-import jax.numpy as jnp
-
-from moleculib.protein.datum import ProteinDatum
-
 import jax
-from jax.tree_util import tree_map, tree_flatten
+import jax.numpy as jnp
+import numpy as np
+from jax.tree_util import tree_flatten, tree_map
+from moleculib.protein.datum import ProteinDatum
 
 
 class dotdict(dict):
@@ -132,7 +129,6 @@ def safe_normalize(vector: jax.Array) -> jax.Array:
 
 import os
 import pickle
-
 
 from moleculib.abstract.dataset import PreProcessedDataset
 

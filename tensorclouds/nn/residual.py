@@ -1,9 +1,8 @@
-from typing import Callable
-from typing import Union
+from typing import Callable, Union
 
 import e3nn_jax as e3nn
-from flax import linen as nn
 import jax
+from flax import linen as nn
 
 from ..tensorcloud import TensorCloud
 

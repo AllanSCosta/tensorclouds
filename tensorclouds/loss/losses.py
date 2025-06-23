@@ -1,19 +1,18 @@
 import re
-import jax
-import jax.numpy as jnp
-from einops import rearrange, repeat
-
-# from tensorclouds.train.schedulers import Scheduler
+from collections import defaultdict
+from typing import Callable, Dict, List, Tuple
 
 import e3nn_jax as e3nn
+import jax
+import jax.numpy as jnp
 import optax
-from typing import Callable, Tuple, Dict, List
-from collections import defaultdict
+from einops import rearrange, repeat
+from moleculib.assembly.datum import AssemblyDatum
+from moleculib.protein.datum import ProteinDatum
 
 from tensorclouds.nn.utils import ModelOutput, safe_norm, safe_normalize
 
-from moleculib.protein.datum import ProteinDatum
-from moleculib.assembly.datum import AssemblyDatum
+# from tensorclouds.train.schedulers import Scheduler
 
 
 class LossFunction:

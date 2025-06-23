@@ -1,8 +1,10 @@
-from .tensorcloud import TensorCloud
+from typing import Tuple
+
+import e3nn_jax as e3nn
 import jax.numpy as jnp
 from flax import linen as nn
-from typing import Tuple
-import e3nn_jax as e3nn
+
+from .tensorcloud import TensorCloud
 
 
 def compute_rotation_for_alignment(x: TensorCloud, y: TensorCloud):

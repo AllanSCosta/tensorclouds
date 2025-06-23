@@ -1,7 +1,8 @@
-from ..tensorcloud import TensorCloud
-import jax.numpy as jnp
 import e3nn_jax as e3nn
 import jax
+import jax.numpy as jnp
+
+from ..tensorcloud import TensorCloud
 
 
 class HarmonicDistribution:

@@ -1,13 +1,12 @@
-from flax import linen as nn
+import e3nn_jax as e3nn
+import jax
 import jax.numpy as jnp
-
+from einops import repeat
+from flax import linen as nn
 from model.base.sequence_convolution import convolution_indices
 from model.base.utils import down_conv_seq_len, up_conv_seq_len
-import e3nn_jax as e3nn
-from ..tensorcloud import TensorCloud
 
-from einops import repeat
-import jax
+from ..tensorcloud import TensorCloud
 
 
 class Upsample(nn.Module):

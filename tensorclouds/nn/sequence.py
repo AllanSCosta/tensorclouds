@@ -1,11 +1,12 @@
 import e3nn_jax as e3nn
-from flax import linen as nn
 import jax
 import jax.numpy as jnp
+from flax import linen as nn
 
-from .layer_norm import EquivariantLayerNorm
-from .utils import up_conv_seq_len, down_conv_seq_len
 from ..tensorcloud import TensorCloud
+from .layer_norm import EquivariantLayerNorm
+from .utils import down_conv_seq_len, up_conv_seq_len
+
 
 def moving_window(a, kernel: int, stride: int):
     """
@@ -75,7 +76,7 @@ class SequenceConvolution(nn.Module):
         assert conv_coord.shape == (new_seq_len, k, 3)
 
         num_neighbors = jnp.sum(conv_mask_coord, axis=1)
-        
+
         # compute new coordinates:
         if self.weighted:
             # have everyone present scores and use them as weights next coordinate:
@@ -88,9 +89,7 @@ class SequenceConvolution(nn.Module):
             relative_weights = jax.nn.softmax(relative_weights, axis=1)
             new_coord = jnp.sum(conv_coord * relative_weights, axis=1)
         else:
-            relative_arrows = (
-                e3nn.flax.Linear(f"1x1e")(conv_irreps_array).array * 0.001
-            )
+            relative_arrows = e3nn.flax.Linear(f"1x1e")(conv_irreps_array).array * 0.001
             new_coord = (
                 (relative_arrows + conv_coord) * conv_mask_coord[:, :, None]
             ).sum(1) / (num_neighbors[:, None] + 1e-6)
@@ -125,7 +124,10 @@ class SequenceConvolution(nn.Module):
         new_mask_irreps_array = new_mask_irreps_array[:, None].repeat(
             new_irreps_array.irreps.num_irreps, axis=-1
         )
-        assert new_mask_irreps_array.shape == (new_seq_len, new_irreps_array.irreps.num_irreps)
+        assert new_mask_irreps_array.shape == (
+            new_seq_len,
+            new_irreps_array.irreps.num_irreps,
+        )
 
         if self.norm:
             new_irreps_array = EquivariantLayerNorm()(new_irreps_array)
@@ -165,7 +167,9 @@ class TransposeSequenceConvolution(nn.Module):
         dst = convolution_indices(reverse_seq_len, k, self.stride, self.mode)
         dst = jnp.where(dst != -1, dst, reverse_seq_len)
 
-        irreps_array_dst = jnp.where((state.mask_irreps_array.sum(-1) > 0)[:, None], dst, reverse_seq_len)
+        irreps_array_dst = jnp.where(
+            (state.mask_irreps_array.sum(-1) > 0)[:, None], dst, reverse_seq_len
+        )
         coord_dst = jnp.where(state.mask_coord[:, None], dst, reverse_seq_len)
         assert dst.shape == (seq_len, k)
 
@@ -180,7 +184,9 @@ class TransposeSequenceConvolution(nn.Module):
 
         coord_num_neigh, new_mask_coord = _num_neighbors(coord_dst)
         irreps_array_num_neigh, new_mask_irreps_array = _num_neighbors(irreps_array_dst)
-        new_mask_irreps_array = new_mask_irreps_array[:, None].repeat(irreps_array.irreps.num_irreps, axis=-1)
+        new_mask_irreps_array = new_mask_irreps_array[:, None].repeat(
+            irreps_array.irreps.num_irreps, axis=-1
+        )
 
         # predict global position for each new leaf
         relative_arrows = e3nn.flax.Linear(f"{k}x1e")(irreps_array)
@@ -215,4 +221,3 @@ class TransposeSequenceConvolution(nn.Module):
             coord=new_coords,
             mask_coord=new_mask_coord,
         )
-

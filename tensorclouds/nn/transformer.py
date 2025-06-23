@@ -1,10 +1,9 @@
-import jax
-import flax.linen as nn
 import e3nn_jax as e3nn
+import flax.linen as nn
+import jax
 import jax.numpy as jnp
+
 from ..tensorcloud import TensorCloud
-
-
 from .attention import EquivariantSelfAttention
 from .feed_forward import FeedForward
 from .layer_norm import EquivariantLayerNorm

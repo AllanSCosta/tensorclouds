@@ -1,8 +1,11 @@
-from ..tensorcloud import TensorCloud
+from functools import reduce
+
 import e3nn_jax as e3nn
-from .layer_norm import EquivariantLayerNorm
-import jax
 import flax.linen as nn
+import jax
+
+from ..tensorcloud import TensorCloud
+from .layer_norm import EquivariantLayerNorm
 
 
 class FullTensorSquareSelfInteraction(nn.Module):
@@ -23,9 +26,6 @@ class FullTensorSquareSelfInteraction(nn.Module):
         features = e3nn.flax.Linear(self.irreps)(features)
 
         return state.replace(irreps_array=features)
-
-
-from functools import reduce
 
 
 class ChannelWiseTensorSquareSelfInteraction(nn.Module):

@@ -4,9 +4,9 @@ import e3nn_jax as e3nn
 import jax
 import jax.numpy as jnp
 import numpy as np
+import py3Dmol
 from einops import rearrange
 from flax import struct
-import py3Dmol
 
 
 @struct.dataclass

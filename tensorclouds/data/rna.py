@@ -1,26 +1,23 @@
 from functools import partial
 from typing import Any, List, Tuple
 
-import numpy as np
+import e3nn_jax as e3nn
+import haiku as hk
 import jax
 import jax.numpy as jnp
-import haiku as hk
-import e3nn_jax as e3nn
+import numpy as np
+from einops import rearrange, repeat
+from jax import tree_util
+from moleculib.nucleic.alphabet import all_nucs  # all_residues,
+from moleculib.nucleic.alphabet import all_nucs_atom_mask  # all_residues_atom_mask,
+from moleculib.nucleic.alphabet import (
+    all_nucs_atom_tokens,
+)  # flippable_arr,; flippable_mask,; all_residues_atom_tokens,
+from moleculib.nucleic.datum import NucleicDatum
+
 from ..nn.self_interaction import SelfInteraction
 from ..nn.utils import dotdict, safe_norm
 from ..tensorcloud import TensorCloud
-
-from einops import rearrange, repeat
-from moleculib.nucleic.alphabet import (
-    all_nucs,  # all_residues,
-    all_nucs_atom_mask,  # all_residues_atom_mask,
-    all_nucs_atom_tokens,  # all_residues_atom_tokens,
-    # flippable_arr,
-    # flippable_mask,
-)
-
-from jax import tree_util
-from moleculib.nucleic.datum import NucleicDatum
 
 
 def nuc_to_tensor_cloud(nuc):

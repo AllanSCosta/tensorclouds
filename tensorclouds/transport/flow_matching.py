@@ -1,18 +1,17 @@
 import functools
+from typing import List
+
+import chex
+import e3nn_jax as e3nn
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
 
-import e3nn_jax as e3nn
-from tensorclouds.random.normal import NormalDistribution
 from tensorclouds.random.harmonic import HarmonicDistribution
-from ..tensorcloud import TensorCloud
+from tensorclouds.random.normal import NormalDistribution
 from tensorclouds.utils import align_with_rotation
 
-from typing import List
-
-
-import chex
+from ..tensorcloud import TensorCloud
 
 
 @chex.dataclass

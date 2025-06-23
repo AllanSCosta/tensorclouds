@@ -1,15 +1,14 @@
 from typing import Callable, List, Tuple
 
-from einops import repeat
-
 import e3nn_jax as e3nn
-from flax import linen as nn
 import jax
 import jax.numpy as jnp
+from einops import repeat
+from flax import linen as nn
 
 from ..tensorcloud import TensorCloud
-
 from .utils import safe_normalize
+
 
 class CompleteSpatialConvolution(nn.Module):
 
@@ -137,7 +136,6 @@ class CompleteSpatialConvolution(nn.Module):
         return state.replace(irreps_array=features)
 
 
-
 def knn(coord: jax.Array, mask: jax.Array, k: int, k_seq: int = None):
     n, d = coord.shape
     distance_matrix = jnp.sum(
@@ -172,9 +170,8 @@ def knn(coord: jax.Array, mask: jax.Array, k: int, k_seq: int = None):
     return neighbors, mask
 
 
-from e3nn_jax.experimental.linear_shtp import LinearSHTP
-
 import einops as ein
+from e3nn_jax.experimental.linear_shtp import LinearSHTP
 
 
 class kNNSpatialConvolution(nn.Module):
@@ -340,5 +337,3 @@ class kNNSpatialConvolution(nn.Module):
             state = state.replace(coord=state.coord + update)
 
         return state.replace(irreps_array=new_features)
-
-

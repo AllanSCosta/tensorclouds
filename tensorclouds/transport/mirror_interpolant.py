@@ -1,16 +1,14 @@
 from typing import Optional, Tuple
 
 import chex
+import e3nn_jax as e3nn
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
-import e3nn_jax as e3nn
 
-from ..tensorcloud import TensorCloud
 from ..random.normal import NormalDistribution
+from ..tensorcloud import TensorCloud
 from .utils import ModelPrediction
-
-import chex
 
 
 class TensorCloudMirrorInterpolant(nn.Module):

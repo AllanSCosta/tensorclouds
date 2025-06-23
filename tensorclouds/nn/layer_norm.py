@@ -1,7 +1,7 @@
 import e3nn_jax as e3nn
-from flax import linen as nn
-import jax.numpy as jnp
 import jax
+import jax.numpy as jnp
+from flax import linen as nn
 
 
 class EquivariantLayerNorm(nn.Module):

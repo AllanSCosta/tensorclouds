@@ -1,9 +1,10 @@
 from typing import Tuple
-import flax.linen as nn
-from tensorclouds.tensorcloud import TensorCloud
 
 import e3nn_jax as e3nn
+import flax.linen as nn
 import jax.numpy as jnp
+
+from tensorclouds.tensorcloud import TensorCloud
 
 
 class ApproximateTimeEmbed(nn.Module):
