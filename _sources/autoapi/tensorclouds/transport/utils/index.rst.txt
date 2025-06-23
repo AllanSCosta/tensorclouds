@@ -1,0 +1,33 @@
+tensorclouds.transport.utils
+============================
+
+.. py:module:: tensorclouds.transport.utils
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   tensorclouds.transport.utils.ModelPrediction
+
+
+Module Contents
+---------------
+
+.. py:class:: ModelPrediction
+
+   .. py:attribute:: prediction
+      :type:  tensorclouds.tensorcloud.TensorCloud
+
+
+   .. py:attribute:: target
+      :type:  dict
+
+
+   .. py:attribute:: reweight
+      :type:  float
+      :value: None
+
+
+

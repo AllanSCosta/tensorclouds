@@ -1,0 +1,22 @@
+tensorclouds.loss.matching
+==========================
+
+.. py:module:: tensorclouds.loss.matching
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   tensorclouds.loss.matching.TensorCloudMatchingLoss
+
+
+Module Contents
+---------------
+
+.. py:class:: TensorCloudMatchingLoss
+
+   Bases: :py:obj:`LossFunction`
+
+

@@ -1,0 +1,157 @@
+tensorclouds
+============
+
+.. py:module:: tensorclouds
+
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 1
+
+   /autoapi/tensorclouds/data/index
+   /autoapi/tensorclouds/loss/index
+   /autoapi/tensorclouds/nn/index
+   /autoapi/tensorclouds/random/index
+   /autoapi/tensorclouds/tensorcloud/index
+   /autoapi/tensorclouds/transport/index
+   /autoapi/tensorclouds/utils/index
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   tensorclouds.TensorCloud
+
+
+Package Contents
+----------------
+
+.. py:class:: TensorCloud
+
+   A TensorCloud is a collection of tensors with associated coordinates and masks.
+   It is used to represent a cloud of tensors in a 3D space, where each tensor can have
+   different irreducible representations (irreps).
+
+   .. attribute:: irreps_array
+
+      The array of tensors with their irreducible representations.
+
+      :type: e3nn.IrrepsArray
+
+   .. attribute:: mask_irreps_array
+
+      A boolean mask indicating which irreps are present.
+
+      :type: jax.Array
+
+   .. attribute:: coord
+
+      The coordinates of the tensors in 3D space.
+
+      :type: jax.Array
+
+   .. attribute:: mask_coord
+
+      A boolean mask indicating which coordinates are valid.
+
+      :type: jax.Array
+
+   .. attribute:: label
+
+      An optional label for the TensorCloud, e.g., for classification tasks.
+
+      :type: jax.Array, optional
+
+
+   .. py:attribute:: irreps_array
+      :type:  e3nn_jax.IrrepsArray
+
+
+   .. py:attribute:: mask_irreps_array
+      :type:  jax.Array
+
+
+   .. py:attribute:: coord
+      :type:  jax.Array
+
+
+   .. py:attribute:: mask_coord
+      :type:  jax.Array
+
+
+   .. py:attribute:: label
+      :type:  jax.Array
+      :value: None
+
+
+
+   .. py:property:: shape
+
+
+   .. py:method:: empty(irreps: e3nn_jax.Irreps)
+      :classmethod:
+
+
+
+   .. py:method:: ones_like(tc)
+      :classmethod:
+
+
+
+   .. py:method:: zeros_like(tc)
+      :classmethod:
+
+
+
+   .. py:property:: irreps
+      :type: e3nn_jax.Irreps
+
+
+
+   .. py:property:: mask
+      :type: jax.Array
+
+
+
+   .. py:method:: replace(**kwargs)
+
+
+   .. py:method:: concatenate(clouds: List[TensorCloud]) -> TensorCloud
+      :classmethod:
+
+
+
+   .. py:method:: zeros(irreps: e3nn_jax.Irreps, shape: tuple) -> TensorCloud
+      :classmethod:
+
+
+
+   .. py:method:: stack(clouds: List[TensorCloud]) -> TensorCloud
+      :classmethod:
+
+
+
+   .. py:method:: split(piece_sizes: List[int]) -> List[TensorCloud]
+
+
+   .. py:method:: centralize()
+
+
+   .. py:method:: plot(view=None, viewer=None, colors=None, radius=0.04, mid=0.95)
+
+
+   .. py:method:: dot(other)
+
+
+   .. py:method:: norm()
+
+      Compute the norm of the irreps_array and coord of the TensorCloud.
+      :returns: A tuple containing the norms of the irreps_array and coord.
+      :rtype: Tuple[jax.Array, jax.Array]
+
+
+

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2D2D2D" />
+    
+    <title>tensorclouds :: tensorclouds.nn.utils</title>
+    
+
+    <link rel="icon" type="image/png" sizes="32x32" href="../../../../_static/logo.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../../../../_static/logo.png">
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+
+    <link rel="stylesheet" href="../../../../_static/css/insegel.css" />
+    <link rel="stylesheet" href="../../../../_static/css/custom.css" />
+
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../../"
+        src="../../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../../_static/sphinx_highlight.js"></script>
+    
+
+    <script
+        src="https://email.tl.fortawesome.com/c/eJxNjUEOgyAQAF8jR7Kw6wIHDh7sP1Cw2mgxgmn6-3JsMqc5zEQfE8dkxOY1KKMUOI3ACFKRJpSW2AAp7ontYIaxI6i7XPJVwyeVfCQ550Os3jLrGSNOLgbdAy6s0PBk2TFNjEbsfq31LB0OnX407pJa5v2faRadwSW63mn5KuLyR9j2tgx3zecanl-55R_-jjPs"></script> 
+</head>
+
+<body>
+    <div id="insegel-container">
+        <header>
+            <div id="logo-container">
+                
+                <a href="../../../../index.html"><img src="../../../../_static/logo.png"></a>
+                
+            </div>
+            <div id="project-container">
+                
+                <h1><strong>tensorclouds</strong> Documentation</h1>
+                
+            </div>
+        </header>
+
+        <div id="content-container">
+
+            <div id="main-content-container">
+                <div id="main-content" role="main">
+                    
+  <section id="module-tensorclouds.nn.utils">
+<span id="tensorclouds-nn-utils"></span><h1>tensorclouds.nn.utils<a class="headerlink" href="#module-tensorclouds.nn.utils" title="Link to this heading">¶</a></h1>
+<section id="classes">
+<h2>Classes<a class="headerlink" href="#classes" title="Link to this heading">¶</a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#tensorclouds.nn.utils.dotdict" title="tensorclouds.nn.utils.dotdict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dotdict</span></code></a></p></td>
+<td><p>dict() -&gt; new empty dictionary</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#tensorclouds.nn.utils.ModelOutput" title="tensorclouds.nn.utils.ModelOutput"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ModelOutput</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#tensorclouds.nn.utils.EmbeddingsDataset" title="tensorclouds.nn.utils.EmbeddingsDataset"><code class="xref py py-obj docutils literal notranslate"><span class="pre">EmbeddingsDataset</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="functions">
+<h2>Functions<a class="headerlink" href="#functions" title="Link to this heading">¶</a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#tensorclouds.nn.utils.l2_norm" title="tensorclouds.nn.utils.l2_norm"><code class="xref py py-obj docutils literal notranslate"><span class="pre">l2_norm</span></code></a>(tree)</p></td>
+<td><p>Compute the l2 norm of a pytree of arrays. Useful for weight decay.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#tensorclouds.nn.utils.clip_grads" title="tensorclouds.nn.utils.clip_grads"><code class="xref py py-obj docutils literal notranslate"><span class="pre">clip_grads</span></code></a>(grad_tree, max_norm)</p></td>
+<td><p>Clip gradients stored as a pytree of arrays to maximum norm <cite>max_norm</cite>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#tensorclouds.nn.utils.inner_stack" title="tensorclouds.nn.utils.inner_stack"><code class="xref py py-obj docutils literal notranslate"><span class="pre">inner_stack</span></code></a>(pytrees)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#tensorclouds.nn.utils.inner_split" title="tensorclouds.nn.utils.inner_split"><code class="xref py py-obj docutils literal notranslate"><span class="pre">inner_split</span></code></a>(pytree)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#tensorclouds.nn.utils.rescale_irreps" title="tensorclouds.nn.utils.rescale_irreps"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rescale_irreps</span></code></a>(irreps, rescale[, chunk_factor])</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#tensorclouds.nn.utils.multiscale_irreps" title="tensorclouds.nn.utils.multiscale_irreps"><code class="xref py py-obj docutils literal notranslate"><span class="pre">multiscale_irreps</span></code></a>(→ List[e3nn_jax.Irreps])</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#tensorclouds.nn.utils.next_multiple" title="tensorclouds.nn.utils.next_multiple"><code class="xref py py-obj docutils literal notranslate"><span class="pre">next_multiple</span></code></a>(→ int)</p></td>
+<td><p>next multiple of factor</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#tensorclouds.nn.utils.up_conv_seq_len" title="tensorclouds.nn.utils.up_conv_seq_len"><code class="xref py py-obj docutils literal notranslate"><span class="pre">up_conv_seq_len</span></code></a>(→ int)</p></td>
+<td><p>output size of a convolutional layer</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#tensorclouds.nn.utils.down_conv_seq_len" title="tensorclouds.nn.utils.down_conv_seq_len"><code class="xref py py-obj docutils literal notranslate"><span class="pre">down_conv_seq_len</span></code></a>(→ int)</p></td>
+<td><p>output size of a convolutional layer</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#tensorclouds.nn.utils.safe_norm" title="tensorclouds.nn.utils.safe_norm"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safe_norm</span></code></a>(→ jax.Array)</p></td>
+<td><p>safe_norm(x) = norm(x) if norm(x) != 0 else 1.0</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#tensorclouds.nn.utils.safe_normalize" title="tensorclouds.nn.utils.safe_normalize"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safe_normalize</span></code></a>(→ jax.Array)</p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="module-contents">
+<h2>Module Contents<a class="headerlink" href="#module-contents" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.dotdict">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.utils.</span></span><span class="sig-name descname"><span class="pre">dotdict</span></span><a class="headerlink" href="#tensorclouds.nn.utils.dotdict" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">dict</span></code></p>
+<p>dict() -&gt; new empty dictionary
+dict(mapping) -&gt; new dictionary initialized from a mapping object’s</p>
+<blockquote>
+<div><p>(key, value) pairs</p>
+</div></blockquote>
+<dl>
+<dt>dict(iterable) -&gt; new dictionary initialized as if via:</dt><dd><p>d = {}
+for k, v in iterable:</p>
+<blockquote>
+<div><p>d[k] = v</p>
+</div></blockquote>
+</dd>
+<dt>dict(<a href="#id1"><span class="problematic" id="id2">**</span></a>kwargs) -&gt; new dictionary initialized with the name=value pairs</dt><dd><p>in the keyword argument list.  For example:  dict(one=1, two=2)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.l2_norm">
+<span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.utils.</span></span><span class="sig-name descname"><span class="pre">l2_norm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tree</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tensorclouds.nn.utils.l2_norm" title="Link to this definition">¶</a></dt>
+<dd><p>Compute the l2 norm of a pytree of arrays. Useful for weight decay.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.clip_grads">
+<span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.utils.</span></span><span class="sig-name descname"><span class="pre">clip_grads</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grad_tree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_norm</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tensorclouds.nn.utils.clip_grads" title="Link to this definition">¶</a></dt>
+<dd><p>Clip gradients stored as a pytree of arrays to maximum norm <cite>max_norm</cite>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.inner_stack">
+<span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.utils.</span></span><span class="sig-name descname"><span class="pre">inner_stack</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pytrees</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tensorclouds.nn.utils.inner_stack" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.inner_split">
+<span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.utils.</span></span><span class="sig-name descname"><span class="pre">inner_split</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pytree</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tensorclouds.nn.utils.inner_split" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.ModelOutput">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.utils.</span></span><span class="sig-name descname"><span class="pre">ModelOutput</span></span><a class="headerlink" href="#tensorclouds.nn.utils.ModelOutput" title="Link to this definition">¶</a></dt>
+<dd><dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.ModelOutput.datum">
+<span class="sig-name descname"><span class="pre">datum</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">moleculib.protein.datum.ProteinDatum</span></em><a class="headerlink" href="#tensorclouds.nn.utils.ModelOutput.datum" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.ModelOutput.encoder_internals">
+<span class="sig-name descname"><span class="pre">encoder_internals</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../../tensorcloud/index.html#tensorclouds.tensorcloud.TensorCloud" title="tensorclouds.tensorcloud.TensorCloud"><span class="pre">tensorclouds.tensorcloud.TensorCloud</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#tensorclouds.nn.utils.ModelOutput.encoder_internals" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.ModelOutput.decoder_internals">
+<span class="sig-name descname"><span class="pre">decoder_internals</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../../tensorcloud/index.html#tensorclouds.tensorcloud.TensorCloud" title="tensorclouds.tensorcloud.TensorCloud"><span class="pre">tensorclouds.tensorcloud.TensorCloud</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#tensorclouds.nn.utils.ModelOutput.decoder_internals" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.ModelOutput.atom_perm_loss">
+<span class="sig-name descname"><span class="pre">atom_perm_loss</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">jax.Array</span></em><a class="headerlink" href="#tensorclouds.nn.utils.ModelOutput.atom_perm_loss" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.ModelOutput.diff_loss">
+<span class="sig-name descname"><span class="pre">diff_loss</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">jax.Array</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#tensorclouds.nn.utils.ModelOutput.diff_loss" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.rescale_irreps">
+<span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.utils.</span></span><span class="sig-name descname"><span class="pre">rescale_irreps</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">irreps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">e3nn_jax.Irreps</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rescale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunk_factor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tensorclouds.nn.utils.rescale_irreps" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.multiscale_irreps">
+<span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.utils.</span></span><span class="sig-name descname"><span class="pre">multiscale_irreps</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">irreps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">e3nn_jax.Irreps</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">depth</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rescale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunk_factor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">e3nn_jax.Irreps</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#tensorclouds.nn.utils.multiscale_irreps" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.next_multiple">
+<span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.utils.</span></span><span class="sig-name descname"><span class="pre">next_multiple</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">factor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#tensorclouds.nn.utils.next_multiple" title="Link to this definition">¶</a></dt>
+<dd><p>next multiple of factor</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.up_conv_seq_len">
+<span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.utils.</span></span><span class="sig-name descname"><span class="pre">up_conv_seq_len</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stride</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#tensorclouds.nn.utils.up_conv_seq_len" title="Link to this definition">¶</a></dt>
+<dd><p>output size of a convolutional layer</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.down_conv_seq_len">
+<span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.utils.</span></span><span class="sig-name descname"><span class="pre">down_conv_seq_len</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stride</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#tensorclouds.nn.utils.down_conv_seq_len" title="Link to this definition">¶</a></dt>
+<dd><p>output size of a convolutional layer</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.safe_norm">
+<span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.utils.</span></span><span class="sig-name descname"><span class="pre">safe_norm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">jax.Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">jax.Array</span></span></span><a class="headerlink" href="#tensorclouds.nn.utils.safe_norm" title="Link to this definition">¶</a></dt>
+<dd><p>safe_norm(x) = norm(x) if norm(x) != 0 else 1.0</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.safe_normalize">
+<span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.utils.</span></span><span class="sig-name descname"><span class="pre">safe_normalize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">jax.Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">jax.Array</span></span></span><a class="headerlink" href="#tensorclouds.nn.utils.safe_normalize" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.EmbeddingsDataset">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.utils.</span></span><span class="sig-name descname"><span class="pre">EmbeddingsDataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transform</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tensorclouds.nn.utils.EmbeddingsDataset" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">moleculib.abstract.dataset.PreProcessedDataset</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.utils.EmbeddingsDataset.path">
+<span class="sig-name descname"><span class="pre">path</span></span><a class="headerlink" href="#tensorclouds.nn.utils.EmbeddingsDataset.path" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+                </div>
+            </div>
+
+            <div id="side-menu-container">
+
+                <div id="search" role="search">
+        <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+            <input type="text" name="q" placeholder="Search..." />
+            <input type="hidden" name="check_keywords" value="yes" />
+            <input type="hidden" name="area" value="default" />
+        </form>
+</div>
+
+                <div id="side-menu" role="navigation">
+
+                    
+  
+    
+  
+  
+    <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../index.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../index.html">API Reference</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../../index.html">tensorclouds</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="../../index.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../index.html#classes">Classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../index.html#package-contents">Package Contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  
+
+
+                </div>
+
+                
+
+            </div>
+
+        </div>
+
+        <footer>
+    <div id="footer-info">
+        <ul id="build-details">
+            
+                <li class="footer-element">
+                    
+                        <a href="../../../../_sources/autoapi/tensorclouds/nn/utils/index.rst.txt" rel="nofollow"> source</a>
+                    
+                </li>
+            
+
+            
+
+            
+        </ul>
+
+        
+            <div id="copyright">
+                &copy; 2024, Center for Bits and Atoms, MIT Media Lab Molecular Machines
+            </div>
+        
+
+        <div id="credit">
+            created with <a href="http://sphinx-doc.org/">Sphinx</a> and <a href="https://github.com/Autophagy/insegel">Insegel</a>
+
+        </div>
+    </div>
+
+    <a id="menu-toggle" class="fa fa-bars" aria-hidden="true"></a>
+
+    <script type="text/javascript">
+      $("#menu-toggle").click(function() {
+        $("#menu-toggle").toggleClass("toggled");
+        $("#side-menu-container").slideToggle(300);
+      });
+    </script>
+
+</footer> 
+
+    </div>
+
+</body>
+
+</html>

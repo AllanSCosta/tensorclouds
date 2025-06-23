@@ -1,0 +1,57 @@
+tensorclouds.loss.losses
+========================
+
+.. py:module:: tensorclouds.loss.losses
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   tensorclouds.loss.losses.LossFunction
+   tensorclouds.loss.losses.LossPipe
+   tensorclouds.loss.losses.VectorCloudMatchingLoss
+   tensorclouds.loss.losses.InternalVectorLoss
+
+
+Module Contents
+---------------
+
+.. py:class:: LossFunction(weight: float = 1.0, start_step: int = 0, scheduler=None)
+
+   .. py:attribute:: weight
+      :value: 1.0
+
+
+
+   .. py:attribute:: start_step
+      :value: 0
+
+
+
+   .. py:attribute:: scheduler
+      :value: None
+
+
+
+.. py:class:: LossPipe(loss_list: List[LossFunction])
+
+   .. py:attribute:: loss_list
+
+
+.. py:class:: VectorCloudMatchingLoss(weight: float = 1.0, start_step: int = 0, scheduler=None)
+
+   Bases: :py:obj:`LossFunction`
+
+
+.. py:class:: InternalVectorLoss(weight=1.0, start_step=0, norm_only=False)
+
+   Bases: :py:obj:`LossFunction`
+
+
+   .. py:attribute:: norm_only
+      :value: False
+
+
+

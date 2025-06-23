@@ -1,0 +1,28 @@
+tensorclouds.utils
+==================
+
+.. py:module:: tensorclouds.utils
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   tensorclouds.utils.compute_rotation_for_alignment
+   tensorclouds.utils.align_with_rotation
+
+
+Module Contents
+---------------
+
+.. py:function:: compute_rotation_for_alignment(x: tensorclouds.tensorcloud.TensorCloud, y: tensorclouds.tensorcloud.TensorCloud)
+
+   Computes the rotation matrix that aligns two point clouds.
+
+
+.. py:function:: align_with_rotation(x0: tensorclouds.tensorcloud.TensorCloud, x1: tensorclouds.tensorcloud.TensorCloud) -> Tuple[tensorclouds.tensorcloud.TensorCloud, tensorclouds.tensorcloud.TensorCloud]
+
+   Aligns x0 to x1 via a rotation.
+
+
