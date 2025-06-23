@@ -1,20 +1,15 @@
 from typing import Callable, List, Tuple
 
-from einops import rearrange, repeat
+from einops import repeat
 
 import e3nn_jax as e3nn
-import flax
 from flax import linen as nn
 import jax
 import jax.numpy as jnp
 
-from .residual import Residual
-from .self_interaction import SelfInteraction
-
-from .layer_norm import EquivariantLayerNorm
-from .profile import profile
 from ..tensorcloud import TensorCloud
 
+from .utils import safe_normalize
 
 class CompleteSpatialConvolution(nn.Module):
 
@@ -141,16 +136,6 @@ class CompleteSpatialConvolution(nn.Module):
 
         return state.replace(irreps_array=features)
 
-
-def safe_norm(vector: jax.Array, axis: int = -1) -> jax.Array:
-    """safe_norm(x) = norm(x) if norm(x) != 0 else 1.0"""
-    norms_sqr = jnp.sum(vector**2, axis=axis)
-    norms = jnp.where(norms_sqr == 0.0, 1.0, norms_sqr) ** 0.5
-    return norms
-
-
-def safe_normalize(vector: jax.Array) -> jax.Array:
-    return vector / safe_norm(vector)[..., None]
 
 
 def knn(coord: jax.Array, mask: jax.Array, k: int, k_seq: int = None):
@@ -355,3 +340,5 @@ class kNNSpatialConvolution(nn.Module):
             state = state.replace(coord=state.coord + update)
 
         return state.replace(irreps_array=new_features)
+
+
