@@ -1,0 +1,136 @@
+tensorclouds.transport.flow_matching
+====================================
+
+.. py:module:: tensorclouds.transport.flow_matching
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   tensorclouds.transport.flow_matching.ModelPrediction
+   tensorclouds.transport.flow_matching.TensorCloudFlowMatcher
+
+
+Module Contents
+---------------
+
+.. py:class:: ModelPrediction
+
+   .. py:attribute:: prediction
+      :type:  tensorclouds.tensorcloud.TensorCloud
+
+
+   .. py:attribute:: target
+      :type:  tensorclouds.tensorcloud.TensorCloud
+
+
+   .. py:attribute:: reweight
+      :type:  float
+      :value: 1.0
+
+
+
+.. py:class:: TensorCloudFlowMatcher
+
+   Bases: :py:obj:`flax.linen.Module`
+
+
+   Base class for all neural network modules.
+
+   Layers and models should subclass this class.
+
+   All Flax Modules are Python 3.7
+   `dataclasses <https://docs.python.org/3/library/dataclasses.html>`_. Since
+   dataclasses take over ``__init__``, you should instead override :meth:`setup`,
+   which is automatically called to initialize the module.
+
+   Modules can contain submodules, and in this way can be nested in a tree
+   structure. Submodels can be assigned as regular attributes inside the
+   :meth:`setup` method.
+
+   You can define arbitrary "forward pass" methods on your Module subclass.
+   While no methods are special-cased, ``__call__`` is a popular choice because
+   it allows you to use module instances as if they are functions::
+
+     >>> from flax import linen as nn
+     >>> from typing import Tuple
+
+     >>> class Module(nn.Module):
+     ...   features: Tuple[int, ...] = (16, 4)
+
+     ...   def setup(self):
+     ...     self.dense1 = nn.Dense(self.features[0])
+     ...     self.dense2 = nn.Dense(self.features[1])
+
+     ...   def __call__(self, x):
+     ...     return self.dense2(nn.relu(self.dense1(x)))
+
+   Optionally, for more concise module implementations where submodules
+   definitions are co-located with their usage, you can use the
+   :meth:`compact` wrapper.
+
+
+   .. py:attribute:: network
+      :type:  flax.linen.Module
+
+
+   .. py:attribute:: irreps
+      :type:  e3nn_jax.Irreps
+
+
+   .. py:attribute:: leading_shape
+      :type:  Tuple[int]
+
+
+   .. py:attribute:: var_features
+      :type:  float
+
+
+   .. py:attribute:: var_coords
+      :type:  float
+
+
+   .. py:method:: setup()
+
+      Initializes a Module lazily (similar to a lazy ``__init__``).
+
+      ``setup`` is called once lazily on a module instance when a module
+      is bound, immediately before any other methods like ``__call__`` are
+      invoked, or before a ``setup``-defined attribute on ``self`` is accessed.
+
+      This can happen in three cases:
+
+        1. Immediately when invoking :meth:`apply`, :meth:`init` or
+           :meth:`init_and_output`.
+
+        2. Once the module is given a name by being assigned to an attribute of
+           another module inside the other module's ``setup`` method
+           (see :meth:`__setattr__`)::
+
+              >>> class MyModule(nn.Module):
+              ...   def setup(self):
+              ...     submodule = nn.Conv(...)
+
+              ...     # Accessing `submodule` attributes does not yet work here.
+
+              ...     # The following line invokes `self.__setattr__`, which gives
+              ...     # `submodule` the name "conv1".
+              ...     self.conv1 = submodule
+
+              ...     # Accessing `submodule` attributes or methods is now safe and
+              ...     # either causes setup() to be called once.
+
+        3. Once a module is constructed inside a method wrapped with
+           :meth:`compact`, immediately before another method is called or
+           ``setup`` defined attribute is accessed.
+
+
+
+   .. py:method:: sample(cond: e3nn_jax.IrrepsArray = None, num_steps: int = 100, mask_features: jax.numpy.array = None, mask_coord: jax.numpy.array = None)
+
+
+   .. py:method:: p_t(x1, t: int, sigma_min: float = 0.01)
+
+
