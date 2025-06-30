@@ -5,11 +5,13 @@ import jax
 from flax import linen as nn
 
 from ..tensorcloud import TensorCloud
+from .layer_norm import EquivariantLayerNorm
 
 
 class Residual(nn.Module):
 
     function: Callable[[TensorCloud], TensorCloud]
+    norm: bool = True
 
     @nn.compact
     def __call__(self, state: TensorCloud) -> TensorCloud:
@@ -22,17 +24,8 @@ class Residual(nn.Module):
         seq_len = state.irreps_array.shape[0]
         new_seq_len = new_state.irreps_array.shape[0]
 
-        if new_seq_len > seq_len:
-            raise ValueError("Residual block cannot increase sequence length")
-
-        if new_seq_len < seq_len:
-            if (seq_len - new_seq_len) % 2 != 0:
-                raise ValueError(
-                    "Residual block cannot decrease sequence length by odd number"
-                )
-
-            pad = (seq_len - new_seq_len) // 2
-            state = jax.tree_util.tree_map(lambda x: x[pad:-pad], state)
+        if new_seq_len != seq_len:
+            raise ValueError("Residual block cannot change sequence length")
 
         if state.irreps_array.irreps == new_state.irreps_array.irreps:
             features = state.irreps_array + new_state.irreps_array
@@ -45,5 +38,8 @@ class Residual(nn.Module):
                     ]
                 )
             )
+
+        if self.norm:
+            features = EquivariantLayerNorm()(features)
 
         return new_state.replace(irreps_array=features)

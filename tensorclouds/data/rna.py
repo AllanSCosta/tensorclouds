@@ -9,10 +9,10 @@ import numpy as np
 from einops import rearrange, repeat
 from jax import tree_util
 from moleculib.nucleic.alphabet import all_nucs  # all_residues,
-from moleculib.nucleic.alphabet import all_nucs_atom_mask  # all_residues_atom_mask,
-from moleculib.nucleic.alphabet import (
-    all_nucs_atom_tokens,
-)  # flippable_arr,; flippable_mask,; all_residues_atom_tokens,
+from moleculib.nucleic.alphabet import \
+    all_nucs_atom_mask  # all_residues_atom_mask,
+from moleculib.nucleic.alphabet import \
+    all_nucs_atom_tokens  # flippable_arr,; flippable_mask,; all_residues_atom_tokens,
 from moleculib.nucleic.datum import NucleicDatum
 
 from ..nn.self_interaction import SelfInteraction

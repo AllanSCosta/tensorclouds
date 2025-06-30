@@ -4,13 +4,9 @@ import e3nn_jax as e3nn
 import jax
 import jax.numpy as jnp
 from einops import rearrange, repeat
-from moleculib.protein.alphabet import (
-    all_residues,
-    all_residues_atom_mask,
-    all_residues_atom_tokens,
-    flippable_arr,
-    flippable_mask,
-)
+from moleculib.protein.alphabet import (all_residues, all_residues_atom_mask,
+                                        all_residues_atom_tokens,
+                                        flippable_arr, flippable_mask)
 from moleculib.protein.datum import ProteinDatum
 
 from ..tensorcloud import TensorCloud

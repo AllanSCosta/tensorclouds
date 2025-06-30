@@ -14,121 +14,71 @@ from tensorclouds.nn.utils import ModelOutput, safe_norm, safe_normalize
 
 # from tensorclouds.train.schedulers import Scheduler
 
-
-class LossFunction:
-    def __init__(self, weight: float = 1.0, start_step: int = 0, scheduler=None):
-        self.weight = weight
-        self.start_step = start_step
-        self.scheduler = scheduler
-
-    def _call(
-        self, model_output: ModelOutput, ProteinDatum: Dict
-    ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
-        raise NotImplementedError
-
-    def __call__(
-        self,
-        rng_key,
-        model_output: ModelOutput,
-        batch: ProteinDatum,
-        step: int,
-    ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
-        output, loss, metrics = self._call(rng_key, model_output, batch)
-        is_activated = jnp.array(self.start_step <= step).astype(loss.dtype)
-        loss = loss * is_activated
-        if self.scheduler is not None:
-            scheduler_weight = self.scheduler(step)
-            loss = loss * scheduler_weight
-            loss_name = re.sub(r"(?<!^)(?=[A-Z])", "_", type(self).__name__).lower()
-            metrics[loss_name + "_scheduler"] = scheduler_weight
-        return output, self.weight * loss, metrics
+CA_INDEX = 1
 
 
-class LossPipe:
-    def __init__(self, loss_list: List[LossFunction]):
-        self.loss_list = loss_list
+def vector_cloud_matching_loss(
+    self,
+    rng_key,
+    model_output: ModelOutput,
+    _: ProteinDatum,
+) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
+    pred, target = model_output.prediction, model_output.target
 
-    def __call__(
-        self,
-        rng_key,
-        model_output: ModelOutput,
-        batch: ProteinDatum,
-        step: int = 0,
-    ):
-        loss = 0.0
-        metrics = {}
-        for loss_fn in self.loss_list:
-            model_output, loss_fn_loss, loss_fn_metrics = loss_fn(
-                rng_key, model_output, batch, step
-            )
-            loss += loss_fn_loss
-            metrics.update(loss_fn_metrics)
-        return model_output, loss, metrics
+    vec_irreps = "1e"
+    pred_vectors = rearrange(
+        pred.irreps_array.filter(vec_irreps).array, "... (v e) -> ... v e", e=3
+    )
+    target_vectors = rearrange(
+        target.irreps_array.filter(vec_irreps).array, "... (v e) -> ... v e", e=3
+    )
+    vec_mask = target_vectors.sum(-1) != 0.0
 
+    pred_vectors = pred_vectors.at[..., ca_index, :].set(0.0) + pred.coord[:, None, :]
+    target_vectors = (
+        target_vectors.at[..., ca_index, :].set(0.0) + target.coord[:, None, :]
+    )
 
-class VectorCloudMatchingLoss(LossFunction):
+    pred_vectors = rearrange(pred_vectors, "r v ... -> (r v) ...")
+    target_vectors = rearrange(target_vectors, "r v ... -> (r v) ...")
+    vec_mask = rearrange(vec_mask, "r v -> (r v)")
 
-    def _call(
-        self, rng_key, model_output: ModelOutput, _: ProteinDatum, ca_index: int = 1
-    ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
-        pred, target = model_output.prediction, model_output.target
-
-        vec_irreps = "1e"
-        pred_vectors = rearrange(
-            pred.irreps_array.filter(vec_irreps).array, "... (v e) -> ... v e", e=3
+    def ij_map(x, distance=True):
+        x_ij = rearrange(x, "... i c -> ... i () c") - rearrange(
+            x, "... j c -> ... () j c"
         )
-        target_vectors = rearrange(
-            target.irreps_array.filter(vec_irreps).array, "... (v e) -> ... v e", e=3
-        )
-        vec_mask = target_vectors.sum(-1) != 0.0
+        return safe_norm(x_ij)[..., None] if distance else x_ij
 
-        pred_vectors = (
-            pred_vectors.at[..., ca_index, :].set(0.0) + pred.coord[:, None, :]
-        )
-        target_vectors = (
-            target_vectors.at[..., ca_index, :].set(0.0) + target.coord[:, None, :]
-        )
+    pred_dist_map = ij_map(pred_vectors)
+    target_dist_map = ij_map(target_vectors)
 
-        pred_vectors = rearrange(pred_vectors, "r v ... -> (r v) ...")
-        target_vectors = rearrange(target_vectors, "r v ... -> (r v) ...")
-        vec_mask = rearrange(vec_mask, "r v -> (r v)")
+    cross_mask = rearrange(vec_mask, "i -> i ()") & rearrange(vec_mask, "j -> () j")
+    vectors_loss = jnp.square(pred_dist_map - target_dist_map)
 
-        def ij_map(x, distance=True):
-            x_ij = rearrange(x, "... i c -> ... i () c") - rearrange(
-                x, "... j c -> ... () j c"
-            )
-            return safe_norm(x_ij)[..., None] if distance else x_ij
+    vectors_loss = jnp.sum(vectors_loss * cross_mask[..., None]) / (
+        jnp.sum(cross_mask) + 1e-6
+    )
 
-        pred_dist_map = ij_map(pred_vectors)
-        target_dist_map = ij_map(target_vectors)
+    pred_coord_dist_map = ij_map(pred.coord)
+    target_coord_dist_map = ij_map(target.coord)
 
-        cross_mask = rearrange(vec_mask, "i -> i ()") & rearrange(vec_mask, "j -> () j")
-        vectors_loss = jnp.square(pred_dist_map - target_dist_map)
+    cross_mask = rearrange(target.mask_coord, "r -> r ()") & rearrange(
+        target.mask_coord, "r -> () r"
+    )
+    coord_loss = jnp.square(pred_coord_dist_map - target_coord_dist_map)
 
-        vectors_loss = jnp.sum(vectors_loss * cross_mask[..., None]) / (
-            jnp.sum(cross_mask) + 1e-6
-        )
+    coord_loss = jnp.sum(coord_loss * cross_mask[..., None]) / (
+        jnp.sum(cross_mask) + 1e-6
+    )
 
-        pred_coord_dist_map = ij_map(pred.coord)
-        target_coord_dist_map = ij_map(target.coord)
-
-        cross_mask = rearrange(target.mask_coord, "r -> r ()") & rearrange(
-            target.mask_coord, "r -> () r"
-        )
-        coord_loss = jnp.square(pred_coord_dist_map - target_coord_dist_map)
-
-        coord_loss = jnp.sum(coord_loss * cross_mask[..., None]) / (
-            jnp.sum(cross_mask) + 1e-6
-        )
-
-        return (
-            model_output,
-            vectors_loss + coord_loss,
-            {"vectors_loss": vectors_loss, "coord_loss": coord_loss},
-        )
+    return (
+        model_output,
+        vectors_loss + coord_loss,
+        {"vectors_loss": vectors_loss, "coord_loss": coord_loss},
+    )
 
 
-class InternalVectorLoss(LossFunction):
+class InternalVectorLoss:
     def __init__(self, weight=1.0, start_step=0, norm_only=False):
         super().__init__(weight=weight, start_step=start_step)
         self.norm_only = norm_only

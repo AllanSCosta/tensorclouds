@@ -1,10 +1,12 @@
-from typing import Callable
+from typing import Callable, Tuple
 
 import e3nn_jax as e3nn
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
 from einops import repeat
+
+from tensorclouds.nn.embed import PairwiseEmbed
 
 from ..tensorcloud import TensorCloud
 
@@ -13,15 +15,9 @@ class EquivariantSelfAttention(nn.Module):
 
     irreps_out: e3nn.Irreps
     num_heads: int = 8
-    k_seq: int = 16
 
-    radial_cut: float = 20.0
-    radial_bins: int = 32
-    radial_basis: str = "gaussian"
-    edge_irreps: e3nn.Irreps = e3nn.Irreps("0e + 1e")
-    norm: bool = True
-    activation: Callable = jax.nn.tanh
-    envelope: bool = False
+    attn_bias: Tuple[PairwiseEmbed] = tuple()
+    activation: Callable = jax.nn.silu
     move: bool = False
 
     @nn.compact
@@ -47,21 +43,12 @@ class EquivariantSelfAttention(nn.Module):
         mask_coord_i = repeat(state.mask_coord, "i -> i j", j=seq_len)
         mask_coord_j = repeat(state.mask_coord, "j -> i j", i=seq_len)
         cross_mask = mask_coord_i & mask_coord_j
-
         vectors = (coord_i - coord_j) * cross_mask[..., None]
-        norm_sqr = jnp.sum(vectors**2, axis=-1)
-        norm = jnp.where(
-            norm_sqr == 0.0, 0.0, jnp.sqrt(jnp.where(norm_sqr == 0.0, 1.0, norm_sqr))
-        )
 
-        ang_embed = e3nn.spherical_harmonics(
-            self.edge_irreps, vectors, True, "component"
-        )
+        edge_irreps = e3nn.Irreps("0e + 1e")
+        ang_embed = e3nn.spherical_harmonics(edge_irreps, vectors, True, "component")
         ang_embed = ang_embed * cross_mask[..., None].astype(ang_embed.array.dtype)
 
-        # q = q + e3nn.flax.Linear(features.irreps)(ang_embed).mul_to_axis(self.num_heads)
-        # k = k + e3nn.flax.Linear(features.irreps)(ang_embed).mul_to_axis(self.num_heads)
-        # v = v + e3nn.flax.Linear(features.irreps)(ang_embed).mul_to_axis(self.num_heads)
         ang_embed = e3nn.flax.Linear(self.num_heads * ang_embed.irreps)(
             ang_embed
         ).mul_to_axis(self.num_heads)
@@ -72,39 +59,15 @@ class EquivariantSelfAttention(nn.Module):
         score = jnp.where(cross_mask[..., None], score, -jnp.inf)
 
         # bias attention weights based on invariants
-        rad_embed = e3nn.soft_one_hot_linspace(
-            norm,
-            start=0.0,
-            end=self.radial_cut,
-            number=self.radial_bins,
-            basis=self.radial_basis,
-            cutoff=True,
-        )
-
-        seq_pos_i = repeat(jnp.arange(seq_len), "i -> i j", j=seq_len)
-        seq_pos_j = repeat(jnp.arange(seq_len), "j -> i j", i=seq_len)
-
-        relative_seq_pos = seq_pos_i - seq_pos_j
-        k_seq = self.k_seq
-
-        relative_seq_pos = jnp.where(
-            jnp.abs(relative_seq_pos) <= k_seq, relative_seq_pos, 0
-        )
-        relative_seq_pos = jnp.where(cross_mask, relative_seq_pos, 0)
-
-        relative_seq_pos = relative_seq_pos + k_seq
-        relative_seq_pos = nn.Embed(
-            num_embeddings=2 * k_seq + 1, features=self.radial_bins
-        )(relative_seq_pos)
-
-        invariants = e3nn.concatenate([relative_seq_pos, rad_embed], axis=-1).regroup()
+        attention_bias = [fn(state) for fn in self.attn_bias]
+        attention_bias = e3nn.concatenate(attention_bias, axis=-1).regroup()
         attention_bias = (
             e3nn.flax.MultiLayerPerceptron(
                 [score.shape[-1]],
                 self.activation,
                 with_bias=True,
                 output_activation=True,
-            )(invariants)
+            )(attention_bias)
             * cross_mask[..., None]
         )
 
