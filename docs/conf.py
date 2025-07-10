@@ -31,7 +31,7 @@ extensions = [
 
 autoapi_type = "python"
 autoapi_dirs = ["../tensorclouds"]
-autoapi_template_dir = "_templates/autoapi"
+autoapi_template_dir = "_templates/apidoc"
 
 autoapi_options = [
     "members",
