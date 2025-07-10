@@ -1,0 +1,63 @@
+tensorclouds.random.normal
+==========================
+
+.. py:module:: tensorclouds.random.normal
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   tensorclouds.random.normal.NormalDistribution
+
+
+Module Contents
+---------------
+
+.. py:class:: NormalDistribution(irreps_in: e3nn_jax.Irreps, irreps_scale: float = 1.0, coords_scale: float = 1.0, coords_mean: Optional[chex.Array] = None, irreps_mean: Optional[e3nn_jax.IrrepsArray] = None)
+
+   A normal distribution for TensorCloud.
+
+
+   .. py:attribute:: irreps_in
+
+
+   .. py:attribute:: irreps_mean
+      :value: None
+
+
+
+   .. py:attribute:: coords_mean
+      :value: None
+
+
+
+   .. py:attribute:: irreps_scale
+      :value: 1.0
+
+
+
+   .. py:attribute:: coords_scale
+      :value: 1.0
+
+
+
+   .. py:method:: sample(key: chex.PRNGKey, leading_shape: Tuple[int, Ellipsis] = (), mask_coord: jax.Array = None, mask_features: jax.Array = None) -> tensorclouds.tensorcloud.TensorCloud
+
+      Sample from the distribution.
+
+
+
+   .. py:method:: sample_like(key: chex.PRNGKey, tensorclouds: tensorclouds.tensorcloud.TensorClouds) -> tensorclouds.tensorcloud.TensorCloud
+
+      Sample from the distribution.
+
+
+
+   .. py:method:: log_likelihood(x: tensorclouds.tensorcloud.TensorCloud) -> chex.Array
+
+      Compute the log probability of the input.
+
+
+

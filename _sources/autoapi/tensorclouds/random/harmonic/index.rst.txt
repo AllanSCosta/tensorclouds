@@ -1,0 +1,39 @@
+tensorclouds.random.harmonic
+============================
+
+.. py:module:: tensorclouds.random.harmonic
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   tensorclouds.random.harmonic.HarmonicDistribution
+
+
+Module Contents
+---------------
+
+.. py:class:: HarmonicDistribution(irreps, N=256, a=3 / 3.8**2, var_features=1.0)
+
+   Harmonic Prior by Jing et al
+   Modified from https://github.com/bjing2016/alphaflow/blob/2c27c69a8adc24d77e1f583b78e0a8d675c76869/alphaflow/utils/diffusion.py#L40
+
+
+   .. py:attribute:: N
+      :value: 256
+
+
+
+   .. py:attribute:: irreps
+
+
+   .. py:attribute:: var_features
+      :value: 1.0
+
+
+
+   .. py:method:: sample(key, leading_shape=(), mask_coord=None, mask_features=None)
+
+
