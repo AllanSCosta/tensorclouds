@@ -38,6 +38,8 @@ class ChannelWiseTensorSquareSelfInteraction(nn.Module):
         features = res = state.irreps_array
 
         dims = [irrep.mul for irrep in features.irreps]
+        assert all(dims[0] == dim for dim in dims), f"Require all multiplicities to be equal"
+
         channel_mix = e3nn.tensor_square(features.mul_to_axis(dims[0])).axis_to_mul()
         features = e3nn.concatenate((features, channel_mix), axis=-1).regroup()
 

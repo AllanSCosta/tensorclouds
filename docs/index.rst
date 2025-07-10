@@ -6,8 +6,13 @@ It provides tools and modules for building and training E3NNs, and a zoo of pre-
 
 
 .. toctree::
-   :maxdepth: 4
-
-   self
+   :maxdepth: 2
+   tensorclouds.tensorcloud
+   tensorclouds.nn
+   tensorclouds.loss
+   tensorclouds.random
+   tensorclouds.transport
+   tensorclouds.data
+   tensorclouds.utils
 
 * :ref:`genindex`

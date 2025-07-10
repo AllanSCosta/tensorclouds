@@ -12,63 +12,6 @@ from moleculib.protein.datum import ProteinDatum
 from ..tensorcloud import TensorCloud
 
 
-def protein_to_tensor_cloud(protein):
-    res_token = protein.residue_token
-    res_mask = protein.atom_mask[..., 1]
-    vectors = protein.atom_coord
-    mask = protein.atom_mask
-
-    ca_coord = vectors[..., 1, :]
-
-    vectors = vectors - ca_coord[..., None, :]
-    vectors = vectors * mask[..., None]
-    vectors = rearrange(vectors, "r a c -> r (a c)")
-
-    irreps_array = e3nn.IrrepsArray("14x1e", jnp.array(vectors))
-
-    state = TensorCloud(
-        irreps_array=irreps_array,
-        mask_irreps_array=jnp.array(mask),
-        coord=jnp.array(ca_coord),
-        mask_coord=jnp.array(res_mask),
-        label=jnp.array(res_token * res_mask),
-    )
-
-    return state
-
-
-def tensor_cloud_to_protein(state, backbone_only=False):
-    irreps_array = state.irreps_array
-    ca_coord = state.coord
-    res_mask = state.mask_coord
-
-    atom_coord = irreps_array.filter("1e").array
-    atom_coord = rearrange(atom_coord, "r (a c) -> r a c", a=14)
-
-    labels = state.label
-    logit_extract = repeat(labels, "r -> r l", l=23) == repeat(
-        jnp.arange(0, 23), "l -> () l"
-    )
-
-    atom_token = (logit_extract[..., None] * all_residues_atom_tokens[None]).sum(-2)
-    atom_mask = (logit_extract[..., None] * all_residues_atom_mask[None]).sum(-2)
-
-    atom_coord = atom_coord.at[..., 1, :].set(0.0)
-    atom_coord = atom_coord + ca_coord[..., None, :]
-    atom_coord = atom_coord * atom_mask[..., None]
-
-    return ProteinDatum(
-        idcode=None,
-        resolution=None,
-        sequence=None,
-        residue_token=labels,
-        residue_index=jnp.arange(labels.shape[0]),
-        residue_mask=res_mask,
-        chain_token=jnp.zeros(labels.shape[0], dtype=jnp.int32),
-        atom_token=atom_token,
-        atom_coord=atom_coord,
-        atom_mask=atom_mask,
-    )
 
 
 import einops as ein
