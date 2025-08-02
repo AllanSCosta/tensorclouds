@@ -1,0 +1,123 @@
+tensorclouds.nn.utils
+=====================
+
+.. py:module:: tensorclouds.nn.utils
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   tensorclouds.nn.utils.dotdict
+   tensorclouds.nn.utils.ModelOutput
+   tensorclouds.nn.utils.EmbeddingsDataset
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   tensorclouds.nn.utils.l2_norm
+   tensorclouds.nn.utils.clip_grads
+   tensorclouds.nn.utils.inner_stack
+   tensorclouds.nn.utils.inner_split
+   tensorclouds.nn.utils.rescale_irreps
+   tensorclouds.nn.utils.multiscale_irreps
+   tensorclouds.nn.utils.next_multiple
+   tensorclouds.nn.utils.up_conv_seq_len
+   tensorclouds.nn.utils.down_conv_seq_len
+   tensorclouds.nn.utils.safe_norm
+   tensorclouds.nn.utils.safe_normalize
+
+
+Module Contents
+---------------
+
+.. py:class:: dotdict
+
+   Bases: :py:obj:`dict`
+
+
+   dict() -> new empty dictionary
+   dict(mapping) -> new dictionary initialized from a mapping object's
+       (key, value) pairs
+   dict(iterable) -> new dictionary initialized as if via:
+       d = {}
+       for k, v in iterable:
+           d[k] = v
+   dict(**kwargs) -> new dictionary initialized with the name=value pairs
+       in the keyword argument list.  For example:  dict(one=1, two=2)
+
+
+.. py:function:: l2_norm(tree)
+
+   Compute the l2 norm of a pytree of arrays. Useful for weight decay.
+
+
+.. py:function:: clip_grads(grad_tree, max_norm)
+
+   Clip gradients stored as a pytree of arrays to maximum norm `max_norm`.
+
+
+.. py:function:: inner_stack(pytrees)
+
+.. py:function:: inner_split(pytree)
+
+.. py:class:: ModelOutput
+
+   .. py:attribute:: datum
+      :type:  moleculib.protein.datum.ProteinDatum
+
+
+   .. py:attribute:: encoder_internals
+      :type:  List[tensorclouds.tensorcloud.TensorCloud]
+
+
+   .. py:attribute:: decoder_internals
+      :type:  List[tensorclouds.tensorcloud.TensorCloud]
+
+
+   .. py:attribute:: atom_perm_loss
+      :type:  jax.Array
+
+
+   .. py:attribute:: diff_loss
+      :type:  List[jax.Array]
+
+
+.. py:function:: rescale_irreps(irreps: e3nn_jax.Irreps, rescale: float, chunk_factor: int = 0)
+
+.. py:function:: multiscale_irreps(irreps: e3nn_jax.Irreps, depth: int, rescale: float, chunk_factor: int = 0) -> List[e3nn_jax.Irreps]
+
+.. py:function:: next_multiple(x: int, factor: int) -> int
+
+   next multiple of factor
+
+
+.. py:function:: up_conv_seq_len(size: int, kernel: int, stride: int, mode: str) -> int
+
+   output size of a convolutional layer
+
+
+.. py:function:: down_conv_seq_len(size: int, kernel: int, stride: int, mode: str) -> int
+
+   output size of a convolutional layer
+
+
+.. py:function:: safe_norm(vector: jax.Array, axis: int = -1) -> jax.Array
+
+   safe_norm(x) = norm(x) if norm(x) != 0 else 1.0
+
+
+.. py:function:: safe_normalize(vector: jax.Array) -> jax.Array
+
+.. py:class:: EmbeddingsDataset(path, transform=[])
+
+   Bases: :py:obj:`moleculib.abstract.dataset.PreProcessedDataset`
+
+
+   .. py:attribute:: path
+
+

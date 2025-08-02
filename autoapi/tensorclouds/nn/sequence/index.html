@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2D2D2D" />
+    
+    <title>tensorclouds :: tensorclouds.nn.sequence</title>
+    
+
+    <link rel="icon" type="image/png" sizes="32x32" href="../../../../_static/logo.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../../../../_static/logo.png">
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+
+    <link rel="stylesheet" href="../../../../_static/css/insegel.css" />
+    <link rel="stylesheet" href="../../../../_static/css/custom.css" />
+
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../../"
+        src="../../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../../_static/sphinx_highlight.js"></script>
+    
+
+    <script
+        src="https://email.tl.fortawesome.com/c/eJxNjUEOgyAQAF8jR7Kw6wIHDh7sP1Cw2mgxgmn6-3JsMqc5zEQfE8dkxOY1KKMUOI3ACFKRJpSW2AAp7ontYIaxI6i7XPJVwyeVfCQ550Os3jLrGSNOLgbdAy6s0PBk2TFNjEbsfq31LB0OnX407pJa5v2faRadwSW63mn5KuLyR9j2tgx3zecanl-55R_-jjPs"></script> 
+</head>
+
+<body>
+    <div id="insegel-container">
+        <header>
+            <div id="logo-container">
+                
+                <a href="../../../../index.html"><img src="../../../../_static/logo.png"></a>
+                
+            </div>
+            <div id="project-container">
+                
+                <h1><strong>tensorclouds</strong> Documentation</h1>
+                
+            </div>
+        </header>
+
+        <div id="content-container">
+
+            <div id="main-content-container">
+                <div id="main-content" role="main">
+                    
+  <section id="module-tensorclouds.nn.sequence">
+<span id="tensorclouds-nn-sequence"></span><h1>tensorclouds.nn.sequence<a class="headerlink" href="#module-tensorclouds.nn.sequence" title="Link to this heading">¶</a></h1>
+<section id="classes">
+<h2>Classes<a class="headerlink" href="#classes" title="Link to this heading">¶</a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#tensorclouds.nn.sequence.SequenceConvolution" title="tensorclouds.nn.sequence.SequenceConvolution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SequenceConvolution</span></code></a></p></td>
+<td><p>Base class for all neural network modules.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#tensorclouds.nn.sequence.TransposeSequenceConvolution" title="tensorclouds.nn.sequence.TransposeSequenceConvolution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TransposeSequenceConvolution</span></code></a></p></td>
+<td><p>Base class for all neural network modules.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="functions">
+<h2>Functions<a class="headerlink" href="#functions" title="Link to this heading">¶</a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#tensorclouds.nn.sequence.moving_window" title="tensorclouds.nn.sequence.moving_window"><code class="xref py py-obj docutils literal notranslate"><span class="pre">moving_window</span></code></a>(a, kernel, stride)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#tensorclouds.nn.sequence.convolution_indices" title="tensorclouds.nn.sequence.convolution_indices"><code class="xref py py-obj docutils literal notranslate"><span class="pre">convolution_indices</span></code></a>(→ jax.Array)</p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="module-contents">
+<h2>Module Contents<a class="headerlink" href="#module-contents" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="tensorclouds.nn.sequence.moving_window">
+<span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.sequence.</span></span><span class="sig-name descname"><span class="pre">moving_window</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stride</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tensorclouds.nn.sequence.moving_window" title="Link to this definition">¶</a></dt>
+<dd><div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">moving_window</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<span class="go">[[1, 2, 3], [3, 4, 5]]</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tensorclouds.nn.sequence.convolution_indices">
+<span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.sequence.</span></span><span class="sig-name descname"><span class="pre">convolution_indices</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sequence_length</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stride</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">jax.Array</span></span></span><a class="headerlink" href="#tensorclouds.nn.sequence.convolution_indices" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="tensorclouds.nn.sequence.SequenceConvolution">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.sequence.</span></span><span class="sig-name descname"><span class="pre">SequenceConvolution</span></span><a class="headerlink" href="#tensorclouds.nn.sequence.SequenceConvolution" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">flax.linen.Module</span></code></p>
+<p>Base class for all neural network modules.</p>
+<p>Layers and models should subclass this class.</p>
+<p>All Flax Modules are Python 3.7
+<a class="reference external" href="https://docs.python.org/3/library/dataclasses.html">dataclasses</a>. Since
+dataclasses take over <code class="docutils literal notranslate"><span class="pre">__init__</span></code>, you should instead override <code class="xref py py-meth docutils literal notranslate"><span class="pre">setup()</span></code>,
+which is automatically called to initialize the module.</p>
+<p>Modules can contain submodules, and in this way can be nested in a tree
+structure. Submodels can be assigned as regular attributes inside the
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">setup()</span></code> method.</p>
+<p>You can define arbitrary “forward pass” methods on your Module subclass.
+While no methods are special-cased, <code class="docutils literal notranslate"><span class="pre">__call__</span></code> is a popular choice because
+it allows you to use module instances as if they are functions:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">flax</span> <span class="kn">import</span> <span class="n">linen</span> <span class="k">as</span> <span class="n">nn</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">Module</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="gp">... </span>  <span class="n">features</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+
+<span class="go">...   def setup(self):</span>
+<span class="go">...     self.dense1 = nn.Dense(self.features[0])</span>
+<span class="go">...     self.dense2 = nn.Dense(self.features[1])</span>
+
+<span class="go">...   def __call__(self, x):</span>
+<span class="go">...     return self.dense2(nn.relu(self.dense1(x)))</span>
+</pre></div>
+</div>
+<p>Optionally, for more concise module implementations where submodules
+definitions are co-located with their usage, you can use the
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">compact()</span></code> wrapper.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.sequence.SequenceConvolution.irreps_out">
+<span class="sig-name descname"><span class="pre">irreps_out</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">e3nn_jax.Irreps</span></em><a class="headerlink" href="#tensorclouds.nn.sequence.SequenceConvolution.irreps_out" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.sequence.SequenceConvolution.stride">
+<span class="sig-name descname"><span class="pre">stride</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#tensorclouds.nn.sequence.SequenceConvolution.stride" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.sequence.SequenceConvolution.kernel_size">
+<span class="sig-name descname"><span class="pre">kernel_size</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#tensorclouds.nn.sequence.SequenceConvolution.kernel_size" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.sequence.SequenceConvolution.weighted">
+<span class="sig-name descname"><span class="pre">weighted</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#tensorclouds.nn.sequence.SequenceConvolution.weighted" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.sequence.SequenceConvolution.norm">
+<span class="sig-name descname"><span class="pre">norm</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">True</span></em><a class="headerlink" href="#tensorclouds.nn.sequence.SequenceConvolution.norm" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.sequence.SequenceConvolution.mode">
+<span class="sig-name descname"><span class="pre">mode</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'same'</span></em><a class="headerlink" href="#tensorclouds.nn.sequence.SequenceConvolution.mode" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="tensorclouds.nn.sequence.TransposeSequenceConvolution">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tensorclouds.nn.sequence.</span></span><span class="sig-name descname"><span class="pre">TransposeSequenceConvolution</span></span><a class="headerlink" href="#tensorclouds.nn.sequence.TransposeSequenceConvolution" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">flax.linen.Module</span></code></p>
+<p>Base class for all neural network modules.</p>
+<p>Layers and models should subclass this class.</p>
+<p>All Flax Modules are Python 3.7
+<a class="reference external" href="https://docs.python.org/3/library/dataclasses.html">dataclasses</a>. Since
+dataclasses take over <code class="docutils literal notranslate"><span class="pre">__init__</span></code>, you should instead override <code class="xref py py-meth docutils literal notranslate"><span class="pre">setup()</span></code>,
+which is automatically called to initialize the module.</p>
+<p>Modules can contain submodules, and in this way can be nested in a tree
+structure. Submodels can be assigned as regular attributes inside the
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">setup()</span></code> method.</p>
+<p>You can define arbitrary “forward pass” methods on your Module subclass.
+While no methods are special-cased, <code class="docutils literal notranslate"><span class="pre">__call__</span></code> is a popular choice because
+it allows you to use module instances as if they are functions:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">flax</span> <span class="kn">import</span> <span class="n">linen</span> <span class="k">as</span> <span class="n">nn</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">Module</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="gp">... </span>  <span class="n">features</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+
+<span class="go">...   def setup(self):</span>
+<span class="go">...     self.dense1 = nn.Dense(self.features[0])</span>
+<span class="go">...     self.dense2 = nn.Dense(self.features[1])</span>
+
+<span class="go">...   def __call__(self, x):</span>
+<span class="go">...     return self.dense2(nn.relu(self.dense1(x)))</span>
+</pre></div>
+</div>
+<p>Optionally, for more concise module implementations where submodules
+definitions are co-located with their usage, you can use the
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">compact()</span></code> wrapper.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.sequence.TransposeSequenceConvolution.irreps_out">
+<span class="sig-name descname"><span class="pre">irreps_out</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">e3nn_jax.Irreps</span></em><a class="headerlink" href="#tensorclouds.nn.sequence.TransposeSequenceConvolution.irreps_out" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.sequence.TransposeSequenceConvolution.stride">
+<span class="sig-name descname"><span class="pre">stride</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#tensorclouds.nn.sequence.TransposeSequenceConvolution.stride" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.sequence.TransposeSequenceConvolution.kernel_size">
+<span class="sig-name descname"><span class="pre">kernel_size</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#tensorclouds.nn.sequence.TransposeSequenceConvolution.kernel_size" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.sequence.TransposeSequenceConvolution.weighted">
+<span class="sig-name descname"><span class="pre">weighted</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#tensorclouds.nn.sequence.TransposeSequenceConvolution.weighted" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.sequence.TransposeSequenceConvolution.norm">
+<span class="sig-name descname"><span class="pre">norm</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">True</span></em><a class="headerlink" href="#tensorclouds.nn.sequence.TransposeSequenceConvolution.norm" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.nn.sequence.TransposeSequenceConvolution.mode">
+<span class="sig-name descname"><span class="pre">mode</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'same'</span></em><a class="headerlink" href="#tensorclouds.nn.sequence.TransposeSequenceConvolution.mode" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+                </div>
+            </div>
+
+            <div id="side-menu-container">
+
+                <div id="search" role="search">
+        <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+            <input type="text" name="q" placeholder="Search..." />
+            <input type="hidden" name="check_keywords" value="yes" />
+            <input type="hidden" name="area" value="default" />
+        </form>
+</div>
+
+                <div id="side-menu" role="navigation">
+
+                    
+  
+    
+  
+  
+    <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../index.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../index.html">API Reference</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../../index.html">tensorclouds</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="../../index.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../index.html#classes">Classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../index.html#package-contents">Package Contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  
+
+
+                </div>
+
+                
+
+            </div>
+
+        </div>
+
+        <footer>
+    <div id="footer-info">
+        <ul id="build-details">
+            
+                <li class="footer-element">
+                    
+                        <a href="../../../../_sources/autoapi/tensorclouds/nn/sequence/index.rst.txt" rel="nofollow"> source</a>
+                    
+                </li>
+            
+
+            
+
+            
+        </ul>
+
+        
+            <div id="copyright">
+                &copy; 2024, Center for Bits and Atoms, MIT Media Lab Molecular Machines
+            </div>
+        
+
+        <div id="credit">
+            created with <a href="http://sphinx-doc.org/">Sphinx</a> and <a href="https://github.com/Autophagy/insegel">Insegel</a>
+
+        </div>
+    </div>
+
+    <a id="menu-toggle" class="fa fa-bars" aria-hidden="true"></a>
+
+    <script type="text/javascript">
+      $("#menu-toggle").click(function() {
+        $("#menu-toggle").toggleClass("toggled");
+        $("#side-menu-container").slideToggle(300);
+      });
+    </script>
+
+</footer> 
+
+    </div>
+
+</body>
+
+</html>

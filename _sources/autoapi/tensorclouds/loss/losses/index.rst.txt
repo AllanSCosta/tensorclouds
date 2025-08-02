@@ -1,0 +1,46 @@
+tensorclouds.loss.losses
+========================
+
+.. py:module:: tensorclouds.loss.losses
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   tensorclouds.loss.losses.CA_INDEX
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   tensorclouds.loss.losses.InternalVectorLoss
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   tensorclouds.loss.losses.vector_cloud_matching_loss
+
+
+Module Contents
+---------------
+
+.. py:data:: CA_INDEX
+   :value: 1
+
+
+.. py:function:: vector_cloud_matching_loss(self, rng_key, model_output: tensorclouds.nn.utils.ModelOutput, _: moleculib.protein.datum.ProteinDatum) -> Tuple[tensorclouds.nn.utils.ModelOutput, jax.Array, Dict[str, float]]
+
+.. py:class:: InternalVectorLoss(weight=1.0, start_step=0, norm_only=False)
+
+   .. py:attribute:: norm_only
+      :value: False
+
+
+

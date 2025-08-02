@@ -1,0 +1,35 @@
+tensorclouds.loss.matching
+==========================
+
+.. py:module:: tensorclouds.loss.matching
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   tensorclouds.loss.matching.TensorCloudMatchingLoss
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   tensorclouds.loss.matching.safe_norm
+
+
+Module Contents
+---------------
+
+.. py:function:: safe_norm(vector: jax.Array, axis: int = -1) -> jax.Array
+
+   safe_norm(x) = norm(x) if norm(x) != 0 else 1.0
+
+
+.. py:class:: TensorCloudMatchingLoss
+
+   Bases: :py:obj:`learnax.loss.LossFunction`
+
+

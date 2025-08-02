@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2D2D2D" />
+    
+    <title>tensorclouds :: tensorclouds.transport.flow_matching</title>
+    
+
+    <link rel="icon" type="image/png" sizes="32x32" href="../../../../_static/logo.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../../../../_static/logo.png">
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+
+    <link rel="stylesheet" href="../../../../_static/css/insegel.css" />
+    <link rel="stylesheet" href="../../../../_static/css/custom.css" />
+
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../../"
+        src="../../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../../_static/sphinx_highlight.js"></script>
+    
+
+    <script
+        src="https://email.tl.fortawesome.com/c/eJxNjUEOgyAQAF8jR7Kw6wIHDh7sP1Cw2mgxgmn6-3JsMqc5zEQfE8dkxOY1KKMUOI3ACFKRJpSW2AAp7ontYIaxI6i7XPJVwyeVfCQ550Os3jLrGSNOLgbdAy6s0PBk2TFNjEbsfq31LB0OnX407pJa5v2faRadwSW63mn5KuLyR9j2tgx3zecanl-55R_-jjPs"></script> 
+</head>
+
+<body>
+    <div id="insegel-container">
+        <header>
+            <div id="logo-container">
+                
+                <a href="../../../../index.html"><img src="../../../../_static/logo.png"></a>
+                
+            </div>
+            <div id="project-container">
+                
+                <h1><strong>tensorclouds</strong> Documentation</h1>
+                
+            </div>
+        </header>
+
+        <div id="content-container">
+
+            <div id="main-content-container">
+                <div id="main-content" role="main">
+                    
+  <section id="module-tensorclouds.transport.flow_matching">
+<span id="tensorclouds-transport-flow-matching"></span><h1>tensorclouds.transport.flow_matching<a class="headerlink" href="#module-tensorclouds.transport.flow_matching" title="Link to this heading">¶</a></h1>
+<section id="classes">
+<h2>Classes<a class="headerlink" href="#classes" title="Link to this heading">¶</a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#tensorclouds.transport.flow_matching.ModelPrediction" title="tensorclouds.transport.flow_matching.ModelPrediction"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ModelPrediction</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#tensorclouds.transport.flow_matching.TensorCloudFlowMatcher" title="tensorclouds.transport.flow_matching.TensorCloudFlowMatcher"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TensorCloudFlowMatcher</span></code></a></p></td>
+<td><p>Base class for all neural network modules.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="module-contents">
+<h2>Module Contents<a class="headerlink" href="#module-contents" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="tensorclouds.transport.flow_matching.ModelPrediction">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tensorclouds.transport.flow_matching.</span></span><span class="sig-name descname"><span class="pre">ModelPrediction</span></span><a class="headerlink" href="#tensorclouds.transport.flow_matching.ModelPrediction" title="Link to this definition">¶</a></dt>
+<dd><dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.transport.flow_matching.ModelPrediction.prediction">
+<span class="sig-name descname"><span class="pre">prediction</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../../tensorcloud/index.html#tensorclouds.tensorcloud.TensorCloud" title="tensorclouds.tensorcloud.TensorCloud"><span class="pre">tensorclouds.tensorcloud.TensorCloud</span></a></em><a class="headerlink" href="#tensorclouds.transport.flow_matching.ModelPrediction.prediction" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.transport.flow_matching.ModelPrediction.target">
+<span class="sig-name descname"><span class="pre">target</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../../tensorcloud/index.html#tensorclouds.tensorcloud.TensorCloud" title="tensorclouds.tensorcloud.TensorCloud"><span class="pre">tensorclouds.tensorcloud.TensorCloud</span></a></em><a class="headerlink" href="#tensorclouds.transport.flow_matching.ModelPrediction.target" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.transport.flow_matching.ModelPrediction.reweight">
+<span class="sig-name descname"><span class="pre">reweight</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1.0</span></em><a class="headerlink" href="#tensorclouds.transport.flow_matching.ModelPrediction.reweight" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="tensorclouds.transport.flow_matching.TensorCloudFlowMatcher">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tensorclouds.transport.flow_matching.</span></span><span class="sig-name descname"><span class="pre">TensorCloudFlowMatcher</span></span><a class="headerlink" href="#tensorclouds.transport.flow_matching.TensorCloudFlowMatcher" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">flax.linen.Module</span></code></p>
+<p>Base class for all neural network modules.</p>
+<p>Layers and models should subclass this class.</p>
+<p>All Flax Modules are Python 3.7
+<a class="reference external" href="https://docs.python.org/3/library/dataclasses.html">dataclasses</a>. Since
+dataclasses take over <code class="docutils literal notranslate"><span class="pre">__init__</span></code>, you should instead override <a class="reference internal" href="#tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.setup" title="tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.setup"><code class="xref py py-meth docutils literal notranslate"><span class="pre">setup()</span></code></a>,
+which is automatically called to initialize the module.</p>
+<p>Modules can contain submodules, and in this way can be nested in a tree
+structure. Submodels can be assigned as regular attributes inside the
+<a class="reference internal" href="#tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.setup" title="tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.setup"><code class="xref py py-meth docutils literal notranslate"><span class="pre">setup()</span></code></a> method.</p>
+<p>You can define arbitrary “forward pass” methods on your Module subclass.
+While no methods are special-cased, <code class="docutils literal notranslate"><span class="pre">__call__</span></code> is a popular choice because
+it allows you to use module instances as if they are functions:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">flax</span> <span class="kn">import</span> <span class="n">linen</span> <span class="k">as</span> <span class="n">nn</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">Module</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="gp">... </span>  <span class="n">features</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+
+<span class="go">...   def setup(self):</span>
+<span class="go">...     self.dense1 = nn.Dense(self.features[0])</span>
+<span class="go">...     self.dense2 = nn.Dense(self.features[1])</span>
+
+<span class="go">...   def __call__(self, x):</span>
+<span class="go">...     return self.dense2(nn.relu(self.dense1(x)))</span>
+</pre></div>
+</div>
+<p>Optionally, for more concise module implementations where submodules
+definitions are co-located with their usage, you can use the
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">compact()</span></code> wrapper.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.network">
+<span class="sig-name descname"><span class="pre">network</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">flax.linen.Module</span></em><a class="headerlink" href="#tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.network" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.irreps">
+<span class="sig-name descname"><span class="pre">irreps</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">e3nn_jax.Irreps</span></em><a class="headerlink" href="#tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.irreps" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.leading_shape">
+<span class="sig-name descname"><span class="pre">leading_shape</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.leading_shape" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.var_features">
+<span class="sig-name descname"><span class="pre">var_features</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.var_features" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.var_coords">
+<span class="sig-name descname"><span class="pre">var_coords</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.var_coords" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.setup">
+<span class="sig-name descname"><span class="pre">setup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.setup" title="Link to this definition">¶</a></dt>
+<dd><p>Initializes a Module lazily (similar to a lazy <code class="docutils literal notranslate"><span class="pre">__init__</span></code>).</p>
+<p><code class="docutils literal notranslate"><span class="pre">setup</span></code> is called once lazily on a module instance when a module
+is bound, immediately before any other methods like <code class="docutils literal notranslate"><span class="pre">__call__</span></code> are
+invoked, or before a <code class="docutils literal notranslate"><span class="pre">setup</span></code>-defined attribute on <code class="docutils literal notranslate"><span class="pre">self</span></code> is accessed.</p>
+<p>This can happen in three cases:</p>
+<blockquote>
+<div><ol class="arabic">
+<li><p>Immediately when invoking <code class="xref py py-meth docutils literal notranslate"><span class="pre">apply()</span></code>, <code class="xref py py-meth docutils literal notranslate"><span class="pre">init()</span></code> or
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">init_and_output()</span></code>.</p></li>
+<li><p>Once the module is given a name by being assigned to an attribute of
+another module inside the other module’s <code class="docutils literal notranslate"><span class="pre">setup</span></code> method
+(see <code class="xref py py-meth docutils literal notranslate"><span class="pre">__setattr__()</span></code>):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">MyModule</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="gp">... </span>  <span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">submodule</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+
+<span class="go">...     # Accessing `submodule` attributes does not yet work here.</span>
+
+<span class="go">...     # The following line invokes `self.__setattr__`, which gives</span>
+<span class="go">...     # `submodule` the name &quot;conv1&quot;.</span>
+<span class="go">...     self.conv1 = submodule</span>
+
+<span class="go">...     # Accessing `submodule` attributes or methods is now safe and</span>
+<span class="go">...     # either causes setup() to be called once.</span>
+</pre></div>
+</div>
+</li>
+<li><p>Once a module is constructed inside a method wrapped with
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">compact()</span></code>, immediately before another method is called or
+<code class="docutils literal notranslate"><span class="pre">setup</span></code> defined attribute is accessed.</p></li>
+</ol>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.sample">
+<span class="sig-name descname"><span class="pre">sample</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cond</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">e3nn_jax.IrrepsArray</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_steps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask_features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">jax.numpy.array</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask_coord</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">jax.numpy.array</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.sample" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.p_t">
+<span class="sig-name descname"><span class="pre">p_t</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma_min</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tensorclouds.transport.flow_matching.TensorCloudFlowMatcher.p_t" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+                </div>
+            </div>
+
+            <div id="side-menu-container">
+
+                <div id="search" role="search">
+        <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+            <input type="text" name="q" placeholder="Search..." />
+            <input type="hidden" name="check_keywords" value="yes" />
+            <input type="hidden" name="area" value="default" />
+        </form>
+</div>
+
+                <div id="side-menu" role="navigation">
+
+                    
+  
+    
+  
+  
+    <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../index.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../index.html">API Reference</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../../index.html">tensorclouds</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="../../index.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../index.html#classes">Classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../index.html#package-contents">Package Contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  
+
+
+                </div>
+
+                
+
+            </div>
+
+        </div>
+
+        <footer>
+    <div id="footer-info">
+        <ul id="build-details">
+            
+                <li class="footer-element">
+                    
+                        <a href="../../../../_sources/autoapi/tensorclouds/transport/flow_matching/index.rst.txt" rel="nofollow"> source</a>
+                    
+                </li>
+            
+
+            
+
+            
+        </ul>
+
+        
+            <div id="copyright">
+                &copy; 2024, Center for Bits and Atoms, MIT Media Lab Molecular Machines
+            </div>
+        
+
+        <div id="credit">
+            created with <a href="http://sphinx-doc.org/">Sphinx</a> and <a href="https://github.com/Autophagy/insegel">Insegel</a>
+
+        </div>
+    </div>
+
+    <a id="menu-toggle" class="fa fa-bars" aria-hidden="true"></a>
+
+    <script type="text/javascript">
+      $("#menu-toggle").click(function() {
+        $("#menu-toggle").toggleClass("toggled");
+        $("#side-menu-container").slideToggle(300);
+      });
+    </script>
+
+</footer> 
+
+    </div>
+
+</body>
+
+</html>

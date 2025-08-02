@@ -1,0 +1,22 @@
+tensorclouds.loss.stochastic_interpolant
+========================================
+
+.. py:module:: tensorclouds.loss.stochastic_interpolant
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   tensorclouds.loss.stochastic_interpolant.StochasticInterpolantLoss
+
+
+Module Contents
+---------------
+
+.. py:class:: StochasticInterpolantLoss
+
+   Bases: :py:obj:`LossFunction`
+
+
