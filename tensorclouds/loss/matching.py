@@ -1,41 +1,60 @@
+from learnax.loss import LossFunction
+import jax
+import jax.numpy as jnp
+from collections import defaultdict
+from typing import Tuple, Dict, Any
+
+import re
+import e3nn_jax as e3nn
+from moleculib.protein.datum import ProteinDatum
+import einops as ein
+
+
+
+def safe_norm(vector: jax.Array, axis: int = -1) -> jax.Array:
+    """safe_norm(x) = norm(x) if norm(x) != 0 else 1.0"""
+    norms_sqr = jnp.sum(vector**2, axis=axis)
+    norms = jnp.where(norms_sqr == 0.0, 1.0, norms_sqr) ** 0.5
+    return norms
+
+import optax
+
 class TensorCloudMatchingLoss(LossFunction):
 
     def _call(
         self,
-        rng_key,
-        model_output: ModelOutput,
-        _: ProteinDatum,
-        reduction="sum",
-    ) -> Tuple[ModelOutput, jax.Array, Dict[str, float]]:
+        model_output: Any,
+        ground: ProteinDatum,
+        reduction="mean",
+    ) -> Tuple[Any, jax.Array, Dict[str, float]]:
 
-        if type(model_output) == tuple:
-            aggr_loss = 0.0
-            metrics = defaultdict(float)
-            for output in model_output:
-                _, loss_, metrics_ = self._call(rng_key, output, _)
-                name = re.sub(r"(?<!^)(?=[A-Z])", "_", type(output).__name__).lower()
-                aggr_loss += loss_
-                for key, value in metrics_.items():
-                    metrics[name + "_" + key] = value
-            return model_output, aggr_loss, metrics
+        pred, target = model_output, ground[1].to_tensor_cloud()
 
-        pred, target = model_output.prediction, model_output.target
-        if hasattr(model_output, "reweight"):
-            reweight = jax.lax.stop_gradient(model_output.reweight)
-        else:
-            reweight = 1.0
 
-        features_loss = jnp.square(pred.irreps_array.array - target.irreps_array.array)
-        features_loss = reweight * features_loss
+        def vector_map_loss(pred, target, mask):
+            vector_map = lambda x: (ein.rearrange(x, "i c -> i () c") 
+                                    - ein.rearrange(x, "j c -> () j c"))
+            cross_mask = (ein.rearrange(mask, "i -> i ()") 
+                          & ein.rearrange(mask, "j -> () j"))
+            
+            vector_maps = vector_map(pred)
+            vector_maps_target = vector_map(target)
+            
+            cross_mask = cross_mask & (safe_norm(vector_maps_target) < 25.0)
 
-        features_mask = (
-            target.mask_irreps_array
-            * e3nn.ones(target.irreps_array.irreps, target.irreps_array.shape[:-1])
-        ).array
-        features_loss = jnp.sum(features_loss * features_mask)
+            error = optax.huber_loss(vector_maps, vector_maps_target).sum(-1)
+            
+            error = (error * cross_mask)
+            error = error.sum((-1, -2)) / (cross_mask.sum((-1, -2)) + 1e-6)
+            # error = error.mean() * (cross_mask.sum() > 0).astype(error.dtype)
+            return error 
+        
+        vecs = lambda irreps_array: ein.rearrange(irreps_array.array, "i (d e)-> i d e", e=3)
 
-        if reduction == "mean":
-            features_loss = features_loss / (jnp.sum(features_mask) + 1e-6)
+        feat_loss = jax.vmap(vector_map_loss)(pred=vecs(pred.irreps_array), target=vecs(target.irreps_array), mask=target.mask_irreps_array)
+        feat_loss = jnp.sum(feat_loss) / (jnp.sum(target.mask_coord))
+        
+        coord_loss = vector_map_loss(pred.coord, target.coord, target.mask_coord)
 
         features_pred_norm = jnp.square(pred.irreps_array.array).sum(-1)
         features_pred_norm = jnp.mean(features_pred_norm)
@@ -43,18 +62,11 @@ class TensorCloudMatchingLoss(LossFunction):
         features_target_norm = jnp.square(target.irreps_array.array).sum(-1)
         features_target_norm = jnp.mean(features_target_norm)
 
-        coord_loss = jnp.square(pred.coord - target.coord)
-        coord_loss = reweight * coord_loss
-        coord_loss = jnp.sum(coord_loss * target.mask_coord[..., None])
-
-        if reduction == "mean":
-            coord_loss = coord_loss / (jnp.sum(target.mask_coord) + 1e-6)
-
         metrics = dict(
-            features_loss=features_loss,
+            features_loss=feat_loss,
+            coord_loss=coord_loss,
             features_pred_norm=features_pred_norm,
             features_target_norm=features_target_norm,
-            coord_loss=coord_loss,
         )
 
-        return model_output, features_loss + coord_loss, metrics
+        return model_output, feat_loss + coord_loss, metrics

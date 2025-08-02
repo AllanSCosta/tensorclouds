@@ -14,7 +14,7 @@ class CompleteSpatialConvolution(nn.Module):
 
     irreps_out: e3nn.Irreps
     radial_cut: float
-    radial_bins: int = 32
+    radial_dim: int = 32
     radial_basis: str = "gaussian"
     edge_irreps: e3nn.Irreps = e3nn.Irreps("0e + 1e + 2e")
     norm: bool = True
@@ -85,7 +85,7 @@ class CompleteSpatialConvolution(nn.Module):
                 norm,
                 start=0.0,
                 end=self.radial_cut,
-                number=self.radial_bins,
+                number=self.radial_dim,
                 basis=self.radial_basis,
                 cutoff=True,
             )
@@ -112,7 +112,7 @@ class CompleteSpatialConvolution(nn.Module):
             [relative_seq_pos, rad_embed, messages.filter("0e")], axis=-1
         ).regroup()
         rad_embed = e3nn.flax.MultiLayerPerceptron(
-            [self.radial_bins, messages.irreps.num_irreps],
+            [self.radial_dim, messages.irreps.num_irreps],
             self.activation,
             with_bias=True,
             output_activation=False,
@@ -180,12 +180,10 @@ class kNNSpatialConvolution(nn.Module):
     k_seq: int = 4
     k: int = 16
     radial_cut: float = 20.0
-    radial_bins: int = 32
+    radial_dim: int = 32
     radial_basis: str = "gaussian"
     edge_irreps: e3nn.Irreps = e3nn.Irreps("0e + 1e + 2e")
-    norm: bool = True
     activation: Callable = jax.nn.silu
-    envelope: bool = False
     move: bool = False
 
     @nn.compact
@@ -247,7 +245,7 @@ class kNNSpatialConvolution(nn.Module):
                 norm,
                 start=0.0,
                 end=self.radial_cut,
-                number=self.radial_bins,
+                number=self.radial_dim,
                 basis=self.radial_basis,
                 cutoff=True,
             )

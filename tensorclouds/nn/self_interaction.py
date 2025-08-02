@@ -65,8 +65,6 @@ class ChannelWiseTensorSquareSelfInteraction(nn.Module):
 class SegmentedTensorSquareSelfInteraction(nn.Module):
 
     irreps: e3nn.Irreps
-    norm: bool = True
-    # num_heads: int =
     segment_size = 2
 
     @nn.compact
@@ -86,9 +84,6 @@ class SegmentedTensorSquareSelfInteraction(nn.Module):
             [invariants.irreps.dim, features.irreps.num_irreps], act=jax.nn.silu
         )(invariants)
         features = e3nn.flax.Linear(self.irreps)(features)
-
-        if self.norm:
-            features = EquivariantLayerNorm()(features)
 
         return state.replace(irreps_array=features)
 

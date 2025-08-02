@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict, Optional
 
 import e3nn_jax as e3nn
 import jax
@@ -7,7 +7,6 @@ import numpy as np
 import py3Dmol
 from einops import rearrange
 from flax import struct
-
 
 @struct.dataclass
 class TensorCloud:
@@ -22,14 +21,14 @@ class TensorCloud:
         coord (jax.Array): The coordinates of the tensors in 3D space.
         mask_coord (jax.Array): A boolean mask indicating which coordinates are valid.
         label (jax.Array, optional): An optional label for the TensorCloud, e.g., for classification tasks.
-
+        err (jax.Array, optional): An optional error array for the TensorCloud.
     """
-
     irreps_array: e3nn.IrrepsArray
     mask_irreps_array: jax.Array
     coord: jax.Array
     mask_coord: jax.Array
     label: jax.Array = None
+    annotations: Optional[Dict[str, jax.Array]] = None
 
     @property
     def shape(self):

@@ -4,7 +4,7 @@ import e3nn_jax as e3nn
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
-from einops import repeat
+from einops import repeat, rearrange
 
 from tensorclouds.nn.embed import PairwiseEmbed
 
@@ -18,8 +18,7 @@ class EquivariantSelfAttention(nn.Module):
 
     attn_bias: Tuple[PairwiseEmbed] = tuple()
     activation: Callable = jax.nn.silu
-    move: bool = False
-
+    
     @nn.compact
     def __call__(self, state: TensorCloud) -> TensorCloud:
         seq_len = state.irreps_array.shape[0]
@@ -43,16 +42,13 @@ class EquivariantSelfAttention(nn.Module):
         mask_coord_i = repeat(state.mask_coord, "i -> i j", j=seq_len)
         mask_coord_j = repeat(state.mask_coord, "j -> i j", i=seq_len)
         cross_mask = mask_coord_i & mask_coord_j
-        vectors = (coord_i - coord_j) * cross_mask[..., None]
+        vecs = (coord_i - coord_j) * cross_mask[..., None]
 
-        edge_irreps = e3nn.Irreps("0e + 1e")
-        ang_embed = e3nn.spherical_harmonics(edge_irreps, vectors, True, "component")
-        ang_embed = ang_embed * cross_mask[..., None].astype(ang_embed.array.dtype)
-
-        ang_embed = e3nn.flax.Linear(self.num_heads * ang_embed.irreps)(
-            ang_embed
-        ).mul_to_axis(self.num_heads)
-        v = e3nn.concatenate((v, ang_embed), axis=-1).regroup()
+        eij = e3nn.spherical_harmonics('1e', vecs, True, "component")
+        eij = eij * cross_mask[..., None].astype(eij.array.dtype)
+        eij = repeat(eij.array, "i j d -> i j h () d", h=self.num_heads)
+        eij = e3nn.IrrepsArray(f'1x1e', eij[..., 0, :])
+        v = e3nn.concatenate([v, eij], axis=-1).regroup()
 
         irreps_in = features.irreps
         score = (q.array * k.array).sum(-1) / jnp.sqrt(irreps_in.num_irreps)
@@ -79,10 +75,5 @@ class EquivariantSelfAttention(nn.Module):
 
         messages = messages.axis_to_mul()
         new_features = e3nn.flax.Linear(self.irreps_out)(messages)
-
-        if self.move:
-            update = e3nn.flax.Linear("1e")(new_features).array
-            new_coord = state.coord + update
-            state = state.replace(coord=new_coord)
 
         return state.replace(irreps_array=new_features)
