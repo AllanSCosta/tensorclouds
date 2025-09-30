@@ -1,3 +1,4 @@
+from sympy import convolution
 import e3nn_jax as e3nn
 import jax
 import jax.numpy as jnp
@@ -145,7 +146,6 @@ class TransposeSequenceConvolution(nn.Module):
     irreps_out: e3nn.Irreps
     stride: int
     kernel_size: int
-    weighted: bool = False
     norm: bool = True
     mode: str = "same"
 
@@ -221,3 +221,85 @@ class TransposeSequenceConvolution(nn.Module):
             coord=new_coords,
             mask_coord=new_mask_coord,
         )
+
+
+
+from typing import List
+
+import jax
+# from .mix import MixingBlock
+
+import e3nn_jax as e3nn
+from flax import linen as nn
+
+from .utils import multiscale_irreps
+
+
+from .feed_forward import CrossedFeedForward
+from .residual import Residual
+from typing import Union
+
+class SequenceEncoder(nn.Module):
+    
+    irreps: e3nn.Irreps
+    depth: int
+    rescale: float
+        
+    stride: int
+    kernel_size: int
+
+    self_interaction: nn.Module = CrossedFeedForward
+    reverse: bool = False
+
+    def setup(
+        self,
+    ):
+        self.list_irreps = multiscale_irreps(
+            self.irreps, self.depth, self.rescale, 0
+        )
+        if self.reverse: 
+            self.list_irreps = self.list_irreps[::-1]
+        self.convolution = SequenceConvolution if not self.reverse else TransposeSequenceConvolution
+
+
+    @nn.compact
+    def __call__(
+        self,
+        state: TensorCloud,
+    ) -> List[TensorCloud]:
+
+        states = [state]
+        state = self.self_interaction(state.irreps_array.irreps)(state)
+
+        for l in range(self.depth):
+            irreps_in = self.list_irreps[l]
+
+            state = Residual(self.convolution(
+                irreps_in,
+                stride=1, # first a convolution pass with stride 1
+                kernel_size=self.kernel_size,
+                mode="same",
+            ))(state)
+            
+            prev_state = state
+            irreps_out = self.list_irreps[l+1]
+
+            state = self.convolution(
+                irreps_out,
+                stride=self.stride,
+                kernel_size=self.kernel_size,
+                mode="valid",
+            )(state)
+
+            state = Residual(self.self_interaction(
+                irreps_out
+            ))(state)
+
+            print(
+                f"Convolved [{prev_state.irreps_array.shape[0]}] {irreps_in} --> [{state.irreps_array.shape[0]}] {irreps_out}"
+            )
+
+            states.append(state)
+                
+        return states
+

@@ -1,5 +1,5 @@
 from functools import reduce
-from typing import List
+from typing import Tuple
 
 import e3nn_jax as e3nn
 import flax.linen as nn
@@ -17,7 +17,9 @@ class TransformerBlock(nn.Module):
 
     irreps: e3nn.Irreps
     ff_factor: int
-    attn_bias: List[PairwiseEmbed]
+    num_heads: int = 4
+
+    attn_bias: Tuple[PairwiseEmbed] = tuple()
     ff: nn.Module = FeedForward
     move: bool = False
 
@@ -26,20 +28,13 @@ class TransformerBlock(nn.Module):
         x = Residual(
             EquivariantSelfAttention(
                 irreps_out=self.irreps,
-                attn_bias=self.attn_bias
+                attn_bias=self.attn_bias,
+                num_heads=self.num_heads,
             )
         )(x)
 
         if self.move:
-            feats = x.irreps_array 
-            vecs_irreps = e3nn.Irreps(self.irreps).filter(keep='1e')
-            gate_irreps = e3nn.Irreps(f"{vecs_irreps.num_irreps}x0e")
-            update = e3nn.flax.Linear("1e")(
-                e3nn.gate(
-                    e3nn.flax.Linear(gate_irreps + vecs_irreps)(feats),
-                    even_gate_act=jax.nn.gelu,
-                )
-            )
+            update = e3nn.flax.Linear("1e")(x.irreps_array)
             new_coord = x.coord + update.array
             x = x.replace(coord=new_coord)
 
@@ -51,18 +46,30 @@ class Transformer(nn.Module):
 
     irreps: e3nn.Irreps
     depth: int
-    ff_factor: int
+        
+    num_heads: int = 4
+    attn_bias: Tuple[PairwiseEmbed] = tuple()
 
-    attn_bias: List[PairwiseEmbed]
-    move: bool = False
     ff: nn.Module = FeedForward
+    ff_factor: int = 4
+    pre_ff: bool = True
+
+    move: bool = False
 
     @nn.compact
     def __call__(self, x: TensorCloud) -> TensorCloud:
+        x = x.replace(
+            irreps_array=e3nn.flax.Linear(self.irreps)(x.irreps_array)
+        )
+        print('Transformer: ', x.irreps)
+        if self.pre_ff:
+            x = Residual(self.ff(self.irreps, self.ff_factor))(x)
         return reduce(
             lambda x, _: TransformerBlock(
                 irreps=self.irreps,
                 attn_bias=self.attn_bias,
+                num_heads=self.num_heads,
+                ff=self.ff,
                 ff_factor=self.ff_factor,
                 move=self.move,
             )(x),

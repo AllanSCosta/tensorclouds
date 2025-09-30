@@ -14,7 +14,7 @@ from ..tensorcloud import TensorCloud
 class EquivariantSelfAttention(nn.Module):
 
     irreps_out: e3nn.Irreps
-    num_heads: int = 8
+    num_heads: int = 4
 
     attn_bias: Tuple[PairwiseEmbed] = tuple()
     activation: Callable = jax.nn.silu

@@ -5,18 +5,19 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "tensorclouds"
 version = "0.1.0"
-description = "Training Pipeline Library"
+description = "Equivariant Neural Networks"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "" }]
 requires-python = ">=3.9"
 dependencies = [
+    "jax[cuda12_pip]==0.4.30",
+    "jaxlib[cuda12_pip]==0.4.30",
     "numpy",
-    "e3nn_jax",
-    "ordered_set",
-    "flax",
-    "einops",
-    "hydra-zen",
+    "e3nn_jax==0.20.7", 
+    "flax==0.8.4", 
+    "einops", 
+    "wandb"
 ]
 classifiers = [
     "Intended Audience :: Developers",
@@ -27,13 +28,10 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 
-[project.optional-dependencies]
-dev = []
-test = ["pytest"]
 
 [tool]
 [tool.setuptools]
-package-dir = {"" = "."}
+package-dir = { "" = "." }
 
 [tool.pydocstyle]
 select = ["D415", "D403"]
@@ -58,3 +56,6 @@ max-complexity = 64
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[[tool.pip.index-url]]
+url = "https://storage.googleapis.com/jax-releases/jax_cuda_releases.html"

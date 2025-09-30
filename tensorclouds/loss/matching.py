@@ -28,9 +28,21 @@ class TensorCloudMatchingLoss(LossFunction):
         reduction="mean",
     ) -> Tuple[Any, jax.Array, Dict[str, float]]:
 
-        pred, target = model_output, ground[1].to_tensor_cloud()
+        if isinstance(model_output, list):
+            total_loss = 0.0
+            total_metrics = defaultdict(float)
+            for model_out in model_output:
+                _, loss, metrics = self._call(model_out, ground, reduction=reduction)
+                total_loss += loss
+                for k, v in metrics.items():
+                    total_metrics[k] += v
+            for k in total_metrics.keys():
+                total_metrics[k] /= len(model_output)
+            return model_output, total_loss / len(model_output), dict(total_metrics)
 
-
+        pred, target = model_output.prediction, model_output.target
+        breakpoint()
+        
         def vector_map_loss(pred, target, mask):
             vector_map = lambda x: (ein.rearrange(x, "i c -> i () c") 
                                     - ein.rearrange(x, "j c -> () j c"))
