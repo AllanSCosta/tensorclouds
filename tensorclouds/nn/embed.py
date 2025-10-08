@@ -44,7 +44,7 @@ class ApproximateTimeEmbed(Embed):
 
 class OnehotTimeEmbed(Embed):
 
-    timesteps: int = 1000
+    timesteps: int = 100
     time_range: Tuple[int] = (0.0, 1.0)
 
     @nn.compact

@@ -13,6 +13,9 @@ from .feed_forward import FeedForward
 from .residual import Residual
 
 
+
+
+
 class TransformerBlock(nn.Module):
 
     irreps: e3nn.Irreps
@@ -34,7 +37,18 @@ class TransformerBlock(nn.Module):
         )(x)
 
         if self.move:
-            update = e3nn.flax.Linear("1e")(x.irreps_array)
+            # update = e3nn.flax.Linear("1e")(x.irreps_array)
+            # new_coord = x.coord + update.array
+            # x = x.replace(coord=new_coord)
+
+            vecs_irreps = e3nn.Irreps(self.irreps).filter(keep='1e')
+            gate_irreps = e3nn.Irreps(f"{vecs_irreps.num_irreps}x0e")
+            update = e3nn.flax.Linear("1e")(
+                e3nn.gate(
+                    e3nn.flax.Linear(gate_irreps + vecs_irreps)(x.irreps_array),
+                    even_gate_act=jax.nn.gelu,
+                )
+            )
             new_coord = x.coord + update.array
             x = x.replace(coord=new_coord)
 
@@ -58,12 +72,12 @@ class Transformer(nn.Module):
 
     @nn.compact
     def __call__(self, x: TensorCloud) -> TensorCloud:
-        x = x.replace(
-            irreps_array=e3nn.flax.Linear(self.irreps)(x.irreps_array)
-        )
-        print('Transformer: ', x.irreps)
-        if self.pre_ff:
-            x = Residual(self.ff(self.irreps, self.ff_factor))(x)
+        # x = x.replace(
+        #     irreps_array=e3nn.flax.Linear(self.irreps)(x.irreps_array)
+        # )
+        # print('Transformer: ', x.irreps)
+        # if self.pre_ff:
+        #     x = Residual(self.ff(self.irreps, self.ff_factor))(x)
         return reduce(
             lambda x, _: TransformerBlock(
                 irreps=self.irreps,
